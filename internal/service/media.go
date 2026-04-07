@@ -14,12 +14,19 @@ import (
 	"github.com/rekanesiads/backend-quiz/pkg/storage"
 )
 
-var allowedAudioTypes = map[string]bool{
+var allowedMediaTypes = map[string]bool{
+	// Audio
 	"audio/mpeg": true,
 	"audio/wav":  true,
 	"audio/ogg":  true,
 	"audio/mp4":  true,
 	"audio/webm": true,
+	// Images
+	"image/jpeg": true,
+	"image/png":  true,
+	"image/gif":  true,
+	"image/webp": true,
+	"image/svg+xml": true,
 }
 
 type MediaService struct {
@@ -74,14 +81,18 @@ func (s *MediaService) Upload(ctx context.Context, userID, cardID uuid.UUID, req
 	}
 
 	// Validate content type
-	if !allowedAudioTypes[strings.ToLower(req.ContentType)] {
+	if !allowedMediaTypes[strings.ToLower(req.ContentType)] {
 		return nil, domain.ErrUnsupportedMedia
 	}
 
 	// Generate R2 key
 	ext := filepath.Ext(req.FileName)
 	if ext == "" {
-		ext = ".mp3"
+		if strings.HasPrefix(req.ContentType, "audio/") {
+			ext = ".mp3"
+		} else {
+			ext = ".bin"
+		}
 	}
 	fileID := uuid.New()
 	r2Key := fmt.Sprintf("media/%s/%s%s", userID.String(), fileID.String(), ext)
