@@ -146,7 +146,7 @@ func (s *StudyService) SubmitReview(ctx context.Context, userID uuid.UUID, sessi
 	}
 
 	// Build FSRS instance with user parameters
-	f := s.buildFSRS(user)
+	f := buildFSRS(user, s.fsrsConfig)
 	now := time.Now()
 
 	// Convert domain card to FSRS card
@@ -251,7 +251,7 @@ func (s *StudyService) Preview(ctx context.Context, userID uuid.UUID, deckID uui
 	}
 
 	// Preview the first due card
-	f := s.buildFSRS(user)
+	f := buildFSRS(user, s.fsrsConfig)
 	fsrsCard := toFSRSCard(&cards[0])
 	recordLog := f.Repeat(fsrsCard, now)
 
@@ -263,19 +263,6 @@ func (s *StudyService) Preview(ctx context.Context, userID uuid.UUID, deckID uui
 	}
 
 	return preview, &counts, nil
-}
-
-func (s *StudyService) buildFSRS(user *domain.User) *fsrs.FSRS {
-	params := fsrs.DefaultParam()
-	params.RequestRetention = user.DesiredRetention
-	params.MaximumInterval = s.fsrsConfig.MaxInterval
-	params.EnableFuzz = s.fsrsConfig.EnableFuzz
-
-	if len(user.FSRSWeights) == len(params.W) {
-		copy(params.W[:], user.FSRSWeights)
-	}
-
-	return fsrs.NewFSRS(params)
 }
 
 func (s *StudyService) countCards(cards []domain.Card) DueCounts {
@@ -294,43 +281,3 @@ func (s *StudyService) countCards(cards []domain.Card) DueCounts {
 	return counts
 }
 
-func toFSRSCard(c *domain.Card) fsrs.Card {
-	fc := fsrs.Card{
-		Due:           c.Due,
-		Stability:     c.Stability,
-		Difficulty:    c.Difficulty,
-		ElapsedDays:   uint64(c.ElapsedDays),
-		ScheduledDays: uint64(c.ScheduledDays),
-		Reps:          uint64(c.Reps),
-		Lapses:        uint64(c.Lapses),
-		State:         fsrs.State(c.State),
-	}
-	if c.LastReview != nil {
-		fc.LastReview = *c.LastReview
-	}
-	return fc
-}
-
-func fromFSRSCard(fc *fsrs.Card, c *domain.Card) {
-	c.Due = fc.Due
-	c.Stability = fc.Stability
-	c.Difficulty = fc.Difficulty
-	c.ElapsedDays = int(fc.ElapsedDays)
-	c.ScheduledDays = int(fc.ScheduledDays)
-	c.Reps = int(fc.Reps)
-	c.Lapses = int(fc.Lapses)
-	c.State = domain.CardState(fc.State)
-	if !fc.LastReview.IsZero() {
-		c.LastReview = &fc.LastReview
-	}
-}
-
-func toPreviewInfo(info fsrs.SchedulingInfo) PreviewInfo {
-	return PreviewInfo{
-		Due:           info.Card.Due,
-		Stability:     info.Card.Stability,
-		Difficulty:    info.Card.Difficulty,
-		ScheduledDays: int(info.Card.ScheduledDays),
-		State:         domain.CardState(info.Card.State).String(),
-	}
-}
