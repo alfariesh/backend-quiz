@@ -81,7 +81,7 @@ func run() error {
 	cardSvc := service.NewCardService(cardRepo, deckRepo)
 	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, cfg.FSRS)
 	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo)
-	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo)
+	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo, userRepo, reviewRepo, cfg.FSRS)
 
 	// Handlers
 	healthH := handler.NewHealthHandler(pool)
@@ -190,6 +190,7 @@ func run() error {
 						r.Post("/", quizH.AddQuestion)
 						r.Post("/batch", quizH.BatchAddQuestions)
 						r.Post("/generate", quizH.GenerateFromDeck)
+					r.Post("/generate-ayat", quizH.GenerateAyatQuiz)
 						r.Put("/{questionID}", quizH.UpdateQuestion)
 						r.Delete("/{questionID}", quizH.DeleteQuestion)
 					})

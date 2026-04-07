@@ -13,12 +13,19 @@ const (
 	QuizTypeTrueFalse = "true_false"
 	QuizTypeFillBlank = "fill_blank"
 	QuizTypeMixed     = "mixed"
+	QuizTypeMixedAyat = "mixed_ayat"
 )
 
 const (
 	QuestionTypeMCQ       = "mcq"
 	QuestionTypeTrueFalse = "true_false"
 	QuestionTypeFillBlank = "fill_blank"
+
+	// Ayat/Hadits question types
+	QuestionTypeAyatCloze        = "ayat_cloze"
+	QuestionTypeAyatContinuation = "ayat_continuation"
+	QuestionTypeSurahID          = "surah_identification"
+	QuestionTypeOrdering         = "ordering"
 )
 
 type Quiz struct {

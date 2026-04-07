@@ -186,6 +186,32 @@ func (h *QuizHandler) GenerateFromDeck(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusCreated, questions)
 }
 
+func (h *QuizHandler) GenerateAyatQuiz(w http.ResponseWriter, r *http.Request) {
+	userID, _ := middleware.GetUserID(r.Context())
+	quizID, err := uuid.Parse(chi.URLParam(r, "quizID"))
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid quiz id")
+		return
+	}
+
+	var req service.GenerateAyatQuizRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := validate.Get().Struct(req); err != nil {
+		JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	questions, err := h.quizSvc.GenerateAyatQuiz(r.Context(), userID, quizID, req)
+	if err != nil {
+		HandleError(w, err)
+		return
+	}
+	JSON(w, http.StatusCreated, questions)
+}
+
 func (h *QuizHandler) UpdateQuestion(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 	quizID, err := uuid.Parse(chi.URLParam(r, "quizID"))

@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
 
+	"github.com/rekanesiads/backend-quiz/config"
 	"github.com/rekanesiads/backend-quiz/internal/domain"
 )
 
@@ -18,6 +21,9 @@ type QuizService struct {
 	attemptRepo domain.QuizAttemptRepository
 	cardRepo    domain.CardRepository
 	deckRepo    domain.DeckRepository
+	userRepo    domain.UserRepository
+	reviewRepo  domain.ReviewRepository
+	fsrsConfig  config.FSRSConfig
 }
 
 func NewQuizService(
@@ -25,12 +31,18 @@ func NewQuizService(
 	attemptRepo domain.QuizAttemptRepository,
 	cardRepo domain.CardRepository,
 	deckRepo domain.DeckRepository,
+	userRepo domain.UserRepository,
+	reviewRepo domain.ReviewRepository,
+	fsrsConfig config.FSRSConfig,
 ) *QuizService {
 	return &QuizService{
 		quizRepo:    quizRepo,
 		attemptRepo: attemptRepo,
 		cardRepo:    cardRepo,
 		deckRepo:    deckRepo,
+		userRepo:    userRepo,
+		reviewRepo:  reviewRepo,
+		fsrsConfig:  fsrsConfig,
 	}
 }
 
@@ -40,7 +52,7 @@ type CreateQuizRequest struct {
 	DeckID           *uuid.UUID `json:"deck_id,omitempty"`
 	Title            string     `json:"title" validate:"required,min=1,max=500"`
 	Description      string     `json:"description" validate:"max=2000"`
-	QuizType         string     `json:"quiz_type" validate:"required,oneof=mcq true_false fill_blank mixed"`
+	QuizType         string     `json:"quiz_type" validate:"required,oneof=mcq true_false fill_blank mixed mixed_ayat"`
 	TimeLimitSeconds *int       `json:"time_limit_seconds,omitempty" validate:"omitempty,min=30,max=7200"`
 	ShuffleQuestions *bool      `json:"shuffle_questions,omitempty"`
 }
@@ -48,7 +60,7 @@ type CreateQuizRequest struct {
 type UpdateQuizRequest struct {
 	Title            *string `json:"title,omitempty" validate:"omitempty,min=1,max=500"`
 	Description      *string `json:"description,omitempty" validate:"omitempty,max=2000"`
-	QuizType         *string `json:"quiz_type,omitempty" validate:"omitempty,oneof=mcq true_false fill_blank mixed"`
+	QuizType         *string `json:"quiz_type,omitempty" validate:"omitempty,oneof=mcq true_false fill_blank mixed mixed_ayat"`
 	TimeLimitSeconds *int    `json:"time_limit_seconds,omitempty" validate:"omitempty,min=30,max=7200"`
 	ShuffleQuestions *bool   `json:"shuffle_questions,omitempty"`
 	IsPublished      *bool   `json:"is_published,omitempty"`
@@ -56,7 +68,7 @@ type UpdateQuizRequest struct {
 
 type AddQuestionRequest struct {
 	CardID        *uuid.UUID      `json:"card_id,omitempty"`
-	QuestionType  string          `json:"question_type" validate:"required,oneof=mcq true_false fill_blank"`
+	QuestionType  string          `json:"question_type" validate:"required,oneof=mcq true_false fill_blank ayat_cloze ayat_continuation surah_identification ordering"`
 	QuestionText  string          `json:"question_text" validate:"required,min=1"`
 	Options       json.RawMessage `json:"options,omitempty"`
 	CorrectAnswer string          `json:"correct_answer" validate:"required,min=1"`
@@ -65,7 +77,7 @@ type AddQuestionRequest struct {
 }
 
 type UpdateQuestionRequest struct {
-	QuestionType  *string          `json:"question_type,omitempty" validate:"omitempty,oneof=mcq true_false fill_blank"`
+	QuestionType  *string          `json:"question_type,omitempty" validate:"omitempty,oneof=mcq true_false fill_blank ayat_cloze ayat_continuation surah_identification ordering"`
 	QuestionText  *string          `json:"question_text,omitempty" validate:"omitempty,min=1"`
 	Options       *json.RawMessage `json:"options,omitempty"`
 	CorrectAnswer *string          `json:"correct_answer,omitempty" validate:"omitempty,min=1"`
@@ -83,6 +95,12 @@ type GenerateFromDeckRequest struct {
 	Count        int       `json:"count" validate:"required,min=1,max=100"`
 }
 
+type GenerateAyatQuizRequest struct {
+	DeckID       uuid.UUID `json:"deck_id" validate:"required"`
+	QuestionType string    `json:"question_type" validate:"required,oneof=ayat_cloze ayat_continuation surah_identification ordering mixed_ayat"`
+	Count        int       `json:"count" validate:"required,min=1,max=100"`
+}
+
 type SubmitAnswerRequest struct {
 	QuestionID uuid.UUID `json:"question_id" validate:"required"`
 	Answer     string    `json:"answer" validate:"required"`
@@ -90,10 +108,13 @@ type SubmitAnswerRequest struct {
 }
 
 type AnswerResult struct {
-	Answer        domain.QuizAnswer `json:"answer"`
-	IsCorrect     bool              `json:"is_correct"`
-	Explanation   string            `json:"explanation"`
-	CorrectAnswer string            `json:"correct_answer"`
+	Answer         domain.QuizAnswer `json:"answer"`
+	IsCorrect      bool              `json:"is_correct"`
+	Explanation    string            `json:"explanation"`
+	CorrectAnswer  string            `json:"correct_answer"`
+	CardUpdated    bool              `json:"card_updated"`
+	NextDue        *time.Time        `json:"next_due,omitempty"`
+	Retrievability *float64          `json:"retrievability,omitempty"`
 }
 
 type QuizDetail struct {
@@ -536,6 +557,326 @@ func (s *QuizService) generateFillBlank(card domain.Card) *domain.QuizQuestion {
 	}
 }
 
+// Ayat/Hadits quiz generation
+
+type ayatCard struct {
+	Card     domain.Card
+	Surat    string
+	AyatNum  int
+}
+
+func parseCardTags(tags []string) (surat string, ayatNum int, ok bool) {
+	for _, t := range tags {
+		if strings.HasPrefix(t, "surat:") {
+			surat = strings.TrimPrefix(t, "surat:")
+		}
+		if strings.HasPrefix(t, "ayat:") {
+			fmt.Sscanf(strings.TrimPrefix(t, "ayat:"), "%d", &ayatNum)
+		}
+	}
+	ok = surat != "" && ayatNum > 0
+	return
+}
+
+func filterAyatCards(cards []domain.Card) []ayatCard {
+	var result []ayatCard
+	for _, c := range cards {
+		surat, ayatNum, ok := parseCardTags(c.Tags)
+		if ok {
+			result = append(result, ayatCard{Card: c, Surat: surat, AyatNum: ayatNum})
+		}
+	}
+	return result
+}
+
+func groupBySurat(cards []ayatCard) map[string][]ayatCard {
+	groups := make(map[string][]ayatCard)
+	for _, c := range cards {
+		groups[c.Surat] = append(groups[c.Surat], c)
+	}
+	// Sort each group by ayat number
+	for surat := range groups {
+		g := groups[surat]
+		sort.Slice(g, func(i, j int) bool { return g[i].AyatNum < g[j].AyatNum })
+		groups[surat] = g
+	}
+	return groups
+}
+
+func (s *QuizService) GenerateAyatQuiz(ctx context.Context, userID, quizID uuid.UUID, req GenerateAyatQuizRequest) ([]*domain.QuizQuestion, error) {
+	quiz, err := s.quizRepo.GetByID(ctx, quizID)
+	if err != nil {
+		return nil, err
+	}
+	if quiz.UserID != userID {
+		return nil, domain.ErrForbidden
+	}
+
+	deck, err := s.deckRepo.GetByID(ctx, req.DeckID)
+	if err != nil {
+		return nil, err
+	}
+	if deck.UserID != userID {
+		return nil, domain.ErrForbidden
+	}
+
+	cards, _, err := s.cardRepo.ListByDeckID(ctx, req.DeckID, domain.CardFilter{}, 10000, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	ayatCards := filterAyatCards(cards)
+	if len(ayatCards) < 2 {
+		return nil, domain.ErrInsufficientCards
+	}
+
+	groups := groupBySurat(ayatCards)
+
+	count, err := s.quizRepo.CountQuestionsByQuizID(ctx, quizID)
+	if err != nil {
+		return nil, err
+	}
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	var questions []*domain.QuizQuestion
+	generated := 0
+
+	for generated < req.Count {
+		qType := req.QuestionType
+		if qType == domain.QuizTypeMixedAyat {
+			types := []string{
+				domain.QuestionTypeAyatCloze,
+				domain.QuestionTypeAyatContinuation,
+				domain.QuestionTypeSurahID,
+				domain.QuestionTypeOrdering,
+			}
+			qType = types[rng.Intn(len(types))]
+		}
+
+		var q *domain.QuizQuestion
+		switch qType {
+		case domain.QuestionTypeAyatCloze:
+			q = s.generateAyatCloze(rng, ayatCards)
+		case domain.QuestionTypeAyatContinuation:
+			q = s.generateAyatContinuation(rng, groups)
+		case domain.QuestionTypeSurahID:
+			q = s.generateSurahIdentification(rng, ayatCards, groups)
+		case domain.QuestionTypeOrdering:
+			q = s.generateOrdering(rng, groups)
+		}
+
+		if q == nil {
+			// Could not generate this type, try another
+			break
+		}
+
+		q.QuizID = quizID
+		q.Position = count + generated
+		questions = append(questions, q)
+		generated++
+	}
+
+	if len(questions) == 0 {
+		return nil, domain.ErrInsufficientCards
+	}
+
+	if err := s.quizRepo.BulkCreateQuestions(ctx, questions); err != nil {
+		return nil, err
+	}
+
+	return questions, nil
+}
+
+func (s *QuizService) generateAyatCloze(rng *rand.Rand, ayatCards []ayatCard) *domain.QuizQuestion {
+	ac := ayatCards[rng.Intn(len(ayatCards))]
+	cardID := ac.Card.ID
+
+	words := strings.Fields(ac.Card.Front)
+	if len(words) < 3 {
+		// Too short to cloze, use full text as fill-blank
+		return &domain.QuizQuestion{
+			CardID:        &cardID,
+			QuestionType:  domain.QuestionTypeAyatCloze,
+			QuestionText:  "_____",
+			CorrectAnswer: ac.Card.Front,
+			Explanation:   fmt.Sprintf("%s - Ayat %d", ac.Surat, ac.AyatNum),
+			Points:        1,
+		}
+	}
+
+	// Blank out 1-2 consecutive words from the middle
+	blankCount := 1
+	if len(words) >= 5 {
+		blankCount = 1 + rng.Intn(2) // 1 or 2
+	}
+	startIdx := 1 + rng.Intn(len(words)-blankCount-1)
+
+	blankedWords := strings.Join(words[startIdx:startIdx+blankCount], " ")
+
+	// Build question text
+	before := strings.Join(words[:startIdx], " ")
+	after := strings.Join(words[startIdx+blankCount:], " ")
+	questionText := before + " _____ " + after
+
+	return &domain.QuizQuestion{
+		CardID:        &cardID,
+		QuestionType:  domain.QuestionTypeAyatCloze,
+		QuestionText:  questionText,
+		CorrectAnswer: blankedWords,
+		Explanation:   fmt.Sprintf("%s - Ayat %d", ac.Surat, ac.AyatNum),
+		Points:        1,
+	}
+}
+
+func (s *QuizService) generateAyatContinuation(rng *rand.Rand, groups map[string][]ayatCard) *domain.QuizQuestion {
+	// Find surat groups with consecutive ayat
+	type pair struct {
+		current ayatCard
+		next    ayatCard
+	}
+	var pairs []pair
+
+	for _, group := range groups {
+		for i := 0; i < len(group)-1; i++ {
+			if group[i+1].AyatNum == group[i].AyatNum+1 {
+				pairs = append(pairs, pair{current: group[i], next: group[i+1]})
+			}
+		}
+	}
+
+	if len(pairs) == 0 {
+		return nil
+	}
+
+	p := pairs[rng.Intn(len(pairs))]
+	cardID := p.next.Card.ID
+
+	return &domain.QuizQuestion{
+		CardID:        &cardID,
+		QuestionType:  domain.QuestionTypeAyatContinuation,
+		QuestionText:  fmt.Sprintf("Lanjutkan ayat setelah:\n%s", p.current.Card.Front),
+		CorrectAnswer: p.next.Card.Front,
+		Explanation:   fmt.Sprintf("%s - Ayat %d", p.next.Surat, p.next.AyatNum),
+		Points:        1,
+	}
+}
+
+func (s *QuizService) generateSurahIdentification(rng *rand.Rand, ayatCards []ayatCard, groups map[string][]ayatCard) *domain.QuizQuestion {
+	if len(groups) < 2 {
+		return nil
+	}
+
+	ac := ayatCards[rng.Intn(len(ayatCards))]
+	cardID := ac.Card.ID
+
+	// Collect unique surat names for distractors
+	var otherSurats []string
+	for surat := range groups {
+		if surat != ac.Surat {
+			otherSurats = append(otherSurats, surat)
+		}
+	}
+	rng.Shuffle(len(otherSurats), func(i, j int) { otherSurats[i], otherSurats[j] = otherSurats[j], otherSurats[i] })
+
+	distractorCount := 3
+	if len(otherSurats) < distractorCount {
+		distractorCount = len(otherSurats)
+	}
+
+	opts := make([]domain.MCQOption, 0, distractorCount+1)
+	opts = append(opts, domain.MCQOption{Text: ac.Surat, IsCorrect: true})
+	for i := 0; i < distractorCount; i++ {
+		opts = append(opts, domain.MCQOption{Text: otherSurats[i], IsCorrect: false})
+	}
+	rng.Shuffle(len(opts), func(i, j int) { opts[i], opts[j] = opts[j], opts[i] })
+
+	optionsJSON, _ := json.Marshal(opts)
+
+	return &domain.QuizQuestion{
+		CardID:        &cardID,
+		QuestionType:  domain.QuestionTypeSurahID,
+		QuestionText:  fmt.Sprintf("Ayat berikut berasal dari surat apa?\n%s", ac.Card.Front),
+		Options:       optionsJSON,
+		CorrectAnswer: ac.Surat,
+		Points:        1,
+	}
+}
+
+type orderingOption struct {
+	ID   string `json:"id"`
+	Text string `json:"text"`
+}
+
+func (s *QuizService) generateOrdering(rng *rand.Rand, groups map[string][]ayatCard) *domain.QuizQuestion {
+	// Find surats with at least 3 consecutive ayat
+	type sequence struct {
+		surat string
+		cards []ayatCard
+	}
+	var sequences []sequence
+
+	for surat, group := range groups {
+		if len(group) >= 3 {
+			// Find consecutive runs
+			for i := 0; i <= len(group)-3; i++ {
+				run := []ayatCard{group[i]}
+				for j := i + 1; j < len(group); j++ {
+					if group[j].AyatNum == run[len(run)-1].AyatNum+1 {
+						run = append(run, group[j])
+					} else {
+						break
+					}
+					if len(run) >= 5 {
+						break
+					}
+				}
+				if len(run) >= 3 {
+					sequences = append(sequences, sequence{surat: surat, cards: run})
+				}
+			}
+		}
+	}
+
+	if len(sequences) == 0 {
+		return nil
+	}
+
+	seq := sequences[rng.Intn(len(sequences))]
+
+	// Take 3-5 ayat
+	takeCount := 3
+	if len(seq.cards) >= 4 {
+		takeCount = 3 + rng.Intn(min(len(seq.cards)-2, 3)) // 3-5
+	}
+	selected := seq.cards[:takeCount]
+
+	// Build correct order
+	correctIDs := make([]string, len(selected))
+	for i, c := range selected {
+		correctIDs[i] = c.Card.ID.String()
+	}
+	correctAnswer := strings.Join(correctIDs, ",")
+
+	// Build shuffled options
+	opts := make([]orderingOption, len(selected))
+	for i, c := range selected {
+		opts[i] = orderingOption{ID: c.Card.ID.String(), Text: c.Card.Front}
+	}
+	rng.Shuffle(len(opts), func(i, j int) { opts[i], opts[j] = opts[j], opts[i] })
+
+	optionsJSON, _ := json.Marshal(opts)
+
+	return &domain.QuizQuestion{
+		QuestionType:  domain.QuestionTypeOrdering,
+		QuestionText:  fmt.Sprintf("Urutkan ayat-ayat berikut dari %s sesuai urutan yang benar:", seq.surat),
+		Options:       optionsJSON,
+		CorrectAnswer: correctAnswer,
+		Explanation:   fmt.Sprintf("%s - Ayat %d-%d", seq.surat, selected[0].AyatNum, selected[len(selected)-1].AyatNum),
+		Points:        2,
+	}
+}
+
 // Attempt operations
 
 func (s *QuizService) StartAttempt(ctx context.Context, userID, quizID uuid.UUID) (*StartAttemptResponse, error) {
@@ -665,12 +1006,19 @@ func (s *QuizService) SubmitAnswer(ctx context.Context, userID, attemptID uuid.U
 		return nil, err
 	}
 
-	return &AnswerResult{
+	result := &AnswerResult{
 		Answer:        *answer,
 		IsCorrect:     isCorrect,
 		Explanation:   question.Explanation,
 		CorrectAnswer: question.CorrectAnswer,
-	}, nil
+	}
+
+	// FSRS integration: update linked card's spaced repetition state
+	if question.CardID != nil {
+		s.applyFSRSFromQuiz(ctx, userID, *question.CardID, isCorrect, req.DurationMS, result)
+	}
+
+	return result, nil
 }
 
 func (s *QuizService) CompleteAttempt(ctx context.Context, userID, attemptID uuid.UUID) (*domain.QuizAttempt, error) {
@@ -738,6 +1086,65 @@ func (s *QuizService) ListAttempts(ctx context.Context, userID, quizID uuid.UUID
 	return s.attemptRepo.ListByQuizID(ctx, quizID, limit, offset)
 }
 
+// FSRS integration
+
+func (s *QuizService) applyFSRSFromQuiz(ctx context.Context, userID uuid.UUID, cardID uuid.UUID, isCorrect bool, durationMS int, result *AnswerResult) {
+	card, err := s.cardRepo.GetByID(ctx, cardID)
+	if err != nil || card.IsSuspended {
+		return
+	}
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return
+	}
+
+	// Map quiz result to FSRS rating
+	var rating fsrs.Rating
+	if isCorrect {
+		rating = fsrs.Good // 3
+	} else {
+		rating = fsrs.Again // 1
+	}
+
+	f := buildFSRS(user, s.fsrsConfig)
+	now := time.Now()
+
+	fsrsCard := toFSRSCard(card)
+	schedulingInfo := f.Next(fsrsCard, now, rating)
+
+	stateBefore := card.State
+
+	fromFSRSCard(&schedulingInfo.Card, card)
+	if err := s.cardRepo.UpdateFSRS(ctx, card); err != nil {
+		return
+	}
+
+	// Create review log with quiz source
+	reviewLog := &domain.ReviewLog{
+		CardID:        card.ID,
+		UserID:        userID,
+		Rating:        domain.Rating(rating),
+		State:         stateBefore,
+		ScheduledDays: int(schedulingInfo.ReviewLog.ScheduledDays),
+		ElapsedDays:   int(schedulingInfo.ReviewLog.ElapsedDays),
+		Stability:     card.Stability,
+		Difficulty:    card.Difficulty,
+		DurationMS:    durationMS,
+		Source:        domain.ReviewSourceQuiz,
+		ReviewedAt:    now,
+	}
+	if err := s.reviewRepo.Create(ctx, reviewLog); err != nil {
+		return
+	}
+
+	retrievability := f.GetRetrievability(schedulingInfo.Card, now)
+
+	result.CardUpdated = true
+	result.NextDue = &card.Due
+	result.Retrievability = &retrievability
+}
+
 // Grading logic
 
 func (s *QuizService) gradeAnswer(question *domain.QuizQuestion, answer string) bool {
@@ -750,7 +1157,9 @@ func (s *QuizService) gradeAnswer(question *domain.QuizQuestion, answer string) 
 	case domain.QuestionTypeTrueFalse:
 		return strings.EqualFold(answer, strings.TrimSpace(question.CorrectAnswer))
 
-	case domain.QuestionTypeFillBlank:
+	case domain.QuestionTypeFillBlank,
+		domain.QuestionTypeAyatCloze,
+		domain.QuestionTypeAyatContinuation:
 		if strings.EqualFold(answer, strings.TrimSpace(question.CorrectAnswer)) {
 			return true
 		}
@@ -766,6 +1175,13 @@ func (s *QuizService) gradeAnswer(question *domain.QuizQuestion, answer string) 
 			}
 		}
 		return false
+
+	case domain.QuestionTypeSurahID:
+		return strings.EqualFold(answer, strings.TrimSpace(question.CorrectAnswer))
+
+	case domain.QuestionTypeOrdering:
+		// Compare comma-separated order exactly
+		return answer == question.CorrectAnswer
 	}
 
 	return false
@@ -805,12 +1221,33 @@ func (s *QuizService) validateQuestionOptions(questionType string, options json.
 			return fmt.Errorf("%w: true/false correct_answer must be 'true' or 'false'", domain.ErrInvalidInput)
 		}
 
-	case domain.QuestionTypeFillBlank:
+	case domain.QuestionTypeFillBlank,
+		domain.QuestionTypeAyatCloze,
+		domain.QuestionTypeAyatContinuation:
 		if len(options) > 0 {
 			var alternatives []string
 			if err := json.Unmarshal(options, &alternatives); err != nil {
-				return fmt.Errorf("%w: fill_blank options must be array of strings", domain.ErrInvalidInput)
+				return fmt.Errorf("%w: fill_blank/ayat options must be array of strings", domain.ErrInvalidInput)
 			}
+		}
+
+	case domain.QuestionTypeSurahID:
+		// Same as MCQ validation
+		if len(options) == 0 {
+			return fmt.Errorf("%w: surah_identification requires options", domain.ErrInvalidInput)
+		}
+		var opts []domain.MCQOption
+		if err := json.Unmarshal(options, &opts); err != nil {
+			return fmt.Errorf("%w: invalid options format", domain.ErrInvalidInput)
+		}
+		if len(opts) < 2 || len(opts) > 6 {
+			return fmt.Errorf("%w: must have 2-6 options", domain.ErrInvalidInput)
+		}
+
+	case domain.QuestionTypeOrdering:
+		// Options should be array of {id, text} objects
+		if len(options) == 0 {
+			return fmt.Errorf("%w: ordering requires options", domain.ErrInvalidInput)
 		}
 	}
 
