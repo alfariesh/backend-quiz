@@ -2,71 +2,61 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/repository/sqlc"
 )
 
 type GoalRepository struct {
-	db *pgxpool.Pool
+	q *sqlc.Queries
 }
 
-func NewGoalRepository(db *pgxpool.Pool) *GoalRepository {
-	return &GoalRepository{db: db}
+func NewGoalRepository(pool *pgxpool.Pool) *GoalRepository {
+	return &GoalRepository{q: sqlc.New(pool)}
 }
 
 func (r *GoalRepository) Upsert(ctx context.Context, goal *domain.StudyGoal) error {
-	return r.db.QueryRow(ctx,
-		`INSERT INTO study_goals (user_id, goal_type, target_value, is_active)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (user_id, goal_type) DO UPDATE SET
-			target_value = EXCLUDED.target_value,
-			is_active = EXCLUDED.is_active,
-			updated_at = now()
-		RETURNING id, created_at, updated_at`,
-		goal.UserID, goal.GoalType, goal.TargetValue, goal.IsActive,
-	).Scan(&goal.ID, &goal.CreatedAt, &goal.UpdatedAt)
+	result, err := r.q.UpsertStudyGoal(ctx, sqlc.UpsertStudyGoalParams{
+		UserID:      goal.UserID,
+		GoalType:    goal.GoalType,
+		TargetValue: int32(goal.TargetValue),
+		IsActive:    goal.IsActive,
+	})
+	if err != nil {
+		return err
+	}
+	*goal = goalFromSqlc(result)
+	return nil
 }
 
 func (r *GoalRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.StudyGoal, error) {
-	var g domain.StudyGoal
-	err := r.db.QueryRow(ctx,
-		`SELECT id, user_id, goal_type, target_value, is_active, created_at, updated_at
-		FROM study_goals WHERE id = $1`, id,
-	).Scan(&g.ID, &g.UserID, &g.GoalType, &g.TargetValue, &g.IsActive, &g.CreatedAt, &g.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, domain.ErrNotFound
+	result, err := r.q.GetStudyGoalByID(ctx, id)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
 	}
-	return &g, err
+	g := goalFromSqlc(result)
+	return &g, nil
 }
 
 func (r *GoalRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain.StudyGoal, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT id, user_id, goal_type, target_value, is_active, created_at, updated_at
-		FROM study_goals WHERE user_id = $1 AND is_active = true
-		ORDER BY created_at`, userID,
-	)
+	rows, err := r.q.ListStudyGoalsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var goals []domain.StudyGoal
-	for rows.Next() {
-		var g domain.StudyGoal
-		if err := rows.Scan(&g.ID, &g.UserID, &g.GoalType, &g.TargetValue, &g.IsActive, &g.CreatedAt, &g.UpdatedAt); err != nil {
-			return nil, err
-		}
-		goals = append(goals, g)
+	goals := make([]domain.StudyGoal, len(rows))
+	for i, row := range rows {
+		goals[i] = goalFromSqlc(row)
 	}
 	return goals, nil
 }
 
 func (r *GoalRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM study_goals WHERE id = $1`, id)
-	return err
+	return r.q.DeleteStudyGoal(ctx, id)
 }

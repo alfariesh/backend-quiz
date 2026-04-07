@@ -25,10 +25,27 @@ SELECT COALESCE(COUNT(*)::int, 0) AS streak
 FROM streak
 WHERE grp = (SELECT grp FROM streak LIMIT 1);
 
--- name: GetTotalReviews :one
-SELECT COALESCE(SUM(reviews)::int, 0) AS total FROM daily_stats WHERE user_id = $1;
-
--- name: GetAverageRetention :one
-SELECT COALESCE(AVG(retention_rate), 0)::real AS avg_retention
-FROM daily_stats
-WHERE user_id = $1 AND retention_rate IS NOT NULL AND date >= $2;
+-- name: GetGlobalLeaderboard :many
+WITH user_streaks AS (
+    SELECT user_id,
+        date,
+        date - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY date DESC))::int * INTERVAL '1 day' AS grp
+    FROM daily_stats
+    WHERE reviews > 0
+),
+current_streaks AS (
+    SELECT user_id, COUNT(*)::int AS streak
+    FROM user_streaks
+    WHERE grp = (
+        SELECT grp FROM user_streaks us2
+        WHERE us2.user_id = user_streaks.user_id
+        ORDER BY date DESC LIMIT 1
+    )
+    GROUP BY user_id
+)
+SELECT cs.user_id, u.display_name, cs.streak
+FROM current_streaks cs
+JOIN users u ON u.id = cs.user_id
+WHERE cs.streak > 0
+ORDER BY cs.streak DESC, u.display_name
+LIMIT $1;

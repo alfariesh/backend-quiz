@@ -5,115 +5,110 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/repository/sqlc"
 )
 
 type ReviewRepository struct {
-	db *pgxpool.Pool
+	q *sqlc.Queries
 }
 
-func NewReviewRepository(db *pgxpool.Pool) *ReviewRepository {
-	return &ReviewRepository{db: db}
+func NewReviewRepository(pool *pgxpool.Pool) *ReviewRepository {
+	return &ReviewRepository{q: sqlc.New(pool)}
 }
 
 func (r *ReviewRepository) Create(ctx context.Context, log *domain.ReviewLog) error {
 	if log.Source == "" {
 		log.Source = domain.ReviewSourceFlashcard
 	}
-	return r.db.QueryRow(ctx,
-		`INSERT INTO review_logs (card_id, user_id, rating, state, scheduled_days, elapsed_days, stability, difficulty, duration_ms, source, reviewed_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING id`,
-		log.CardID, log.UserID, int16(log.Rating), int16(log.State), log.ScheduledDays, log.ElapsedDays,
-		log.Stability, log.Difficulty, log.DurationMS, log.Source, log.ReviewedAt,
-	).Scan(&log.ID)
+	result, err := r.q.CreateReviewLog(ctx, sqlc.CreateReviewLogParams{
+		CardID:        log.CardID,
+		UserID:        log.UserID,
+		Rating:        int16(log.Rating),
+		State:         int16(log.State),
+		ScheduledDays: int32(log.ScheduledDays),
+		ElapsedDays:   int32(log.ElapsedDays),
+		Stability:     float32(log.Stability),
+		Difficulty:    float32(log.Difficulty),
+		DurationMs:    int32(log.DurationMS),
+		Source:        log.Source,
+		ReviewedAt:    log.ReviewedAt,
+	})
+	if err != nil {
+		return err
+	}
+	log.ID = result.ID
+	return nil
 }
 
 func (r *ReviewRepository) ListByCardID(ctx context.Context, cardID uuid.UUID) ([]domain.ReviewLog, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT id, card_id, user_id, rating, state, scheduled_days, elapsed_days, stability, difficulty, duration_ms, source, reviewed_at
-		FROM review_logs WHERE card_id = $1 ORDER BY reviewed_at DESC`, cardID,
-	)
+	rows, err := r.q.ListReviewLogsByCardID(ctx, cardID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var logs []domain.ReviewLog
-	for rows.Next() {
-		var l domain.ReviewLog
-		if err := rows.Scan(&l.ID, &l.CardID, &l.UserID, &l.Rating, &l.State, &l.ScheduledDays,
-			&l.ElapsedDays, &l.Stability, &l.Difficulty, &l.DurationMS, &l.Source, &l.ReviewedAt); err != nil {
-			return nil, err
-		}
-		logs = append(logs, l)
+	logs := make([]domain.ReviewLog, len(rows))
+	for i, row := range rows {
+		logs[i] = reviewLogFromSqlc(row)
 	}
 	return logs, nil
 }
 
 func (r *ReviewRepository) ListByUserID(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int) ([]domain.ReviewLog, int, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT id, card_id, user_id, rating, state, scheduled_days, elapsed_days, stability, difficulty, duration_ms, source, reviewed_at
-		FROM review_logs
-		WHERE user_id = $1 AND reviewed_at >= $2 AND reviewed_at < $3
-		ORDER BY reviewed_at DESC
-		LIMIT $4 OFFSET $5`,
-		userID, from, to, limit, offset,
-	)
+	rows, err := r.q.ListReviewLogsByUserID(ctx, sqlc.ListReviewLogsByUserIDParams{
+		UserID:     userID,
+		ReviewedAt: from,
+		ReviewedAt_2: to,
+		Limit:      int32(limit),
+		Offset:     int32(offset),
+	})
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
 
-	var logs []domain.ReviewLog
-	for rows.Next() {
-		var l domain.ReviewLog
-		if err := rows.Scan(&l.ID, &l.CardID, &l.UserID, &l.Rating, &l.State, &l.ScheduledDays,
-			&l.ElapsedDays, &l.Stability, &l.Difficulty, &l.DurationMS, &l.Source, &l.ReviewedAt); err != nil {
-			return nil, 0, err
-		}
-		logs = append(logs, l)
+	total, err := r.q.CountReviewLogsByUserID(ctx, sqlc.CountReviewLogsByUserIDParams{
+		UserID:     userID,
+		ReviewedAt: from,
+		ReviewedAt_2: to,
+	})
+	if err != nil {
+		return nil, 0, err
 	}
 
-	var total int
-	err = r.db.QueryRow(ctx,
-		`SELECT COUNT(*)::int FROM review_logs WHERE user_id = $1 AND reviewed_at >= $2 AND reviewed_at < $3`,
-		userID, from, to,
-	).Scan(&total)
-	return logs, total, err
+	logs := make([]domain.ReviewLog, len(rows))
+	for i, row := range rows {
+		logs[i] = reviewLogFromSqlc(row)
+	}
+	return logs, int(total), nil
 }
 
 func (r *ReviewRepository) CountByUserAndDate(ctx context.Context, userID uuid.UUID, date time.Time) (int, error) {
-	var count int
-	err := r.db.QueryRow(ctx,
-		`SELECT COUNT(*)::int FROM review_logs WHERE user_id = $1 AND reviewed_at::date = $2::date`,
-		userID, date,
-	).Scan(&count)
-	return count, err
+	count, err := r.q.CountReviewsByUserAndDate(ctx, sqlc.CountReviewsByUserAndDateParams{
+		UserID: userID,
+		Date:   pgtype.Date{Time: date, Valid: true},
+	})
+	return int(count), err
 }
 
 func (r *ReviewRepository) GetReviewCountsPerDay(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]domain.DailyReviewCount, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT reviewed_at::date AS date, COUNT(*)::int AS count, COUNT(*) FILTER (WHERE rating >= 3)::int AS correct
-		FROM review_logs
-		WHERE user_id = $1 AND reviewed_at >= $2 AND reviewed_at < $3
-		GROUP BY reviewed_at::date
-		ORDER BY date`, userID, from, to,
-	)
+	rows, err := r.q.GetReviewCountsPerDay(ctx, sqlc.GetReviewCountsPerDayParams{
+		UserID:       userID,
+		ReviewedAt:   from,
+		ReviewedAt_2: to,
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var counts []domain.DailyReviewCount
-	for rows.Next() {
-		var c domain.DailyReviewCount
-		if err := rows.Scan(&c.Date, &c.Count, &c.Correct); err != nil {
-			return nil, err
+	counts := make([]domain.DailyReviewCount, len(rows))
+	for i, row := range rows {
+		counts[i] = domain.DailyReviewCount{
+			Date:    row.Date.Time,
+			Count:   int(row.Count),
+			Correct: int(row.Correct),
 		}
-		counts = append(counts, c)
 	}
 	return counts, nil
 }

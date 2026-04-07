@@ -1,6 +1,6 @@
 -- name: CreateReviewLog :one
-INSERT INTO review_logs (card_id, user_id, rating, state, scheduled_days, elapsed_days, stability, difficulty, duration_ms, reviewed_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO review_logs (card_id, user_id, rating, state, scheduled_days, elapsed_days, stability, difficulty, duration_ms, source, reviewed_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING *;
 
 -- name: ListReviewLogsByCardID :many
@@ -18,7 +18,7 @@ WHERE user_id = $1 AND reviewed_at >= $2 AND reviewed_at < $3;
 
 -- name: CountReviewsByUserAndDate :one
 SELECT COUNT(*)::int FROM review_logs
-WHERE user_id = $1 AND reviewed_at::date = $2::date;
+WHERE user_id = @user_id AND reviewed_at::date = @date::date;
 
 -- name: GetReviewCountsPerDay :many
 SELECT
