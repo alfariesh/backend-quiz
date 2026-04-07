@@ -21,6 +21,7 @@ import (
 	"github.com/rekanesiads/backend-quiz/internal/repository"
 	"github.com/rekanesiads/backend-quiz/internal/service"
 	appOtel "github.com/rekanesiads/backend-quiz/pkg/otel"
+	"github.com/rekanesiads/backend-quiz/pkg/storage"
 )
 
 func main() {
@@ -84,27 +85,34 @@ func run() error {
 	reviewRepo := repository.NewReviewRepository(pool)
 	sessionRepo := repository.NewStudySessionRepository(pool)
 	statsRepo := repository.NewStatsRepository(pool)
+	quizRepo := repository.NewQuizRepository(pool)
+	quizAttemptRepo := repository.NewQuizAttemptRepository(pool)
+	mediaRepo := repository.NewMediaRepository(pool)
+	goalRepo := repository.NewGoalRepository(pool)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.RefreshDuration)
 	oauthSvc := service.NewOAuthService(cfg.GoogleOAuth)
-	mediaSvc := service.NewMediaService(cfg.R2)
 	deckSvc := service.NewDeckService(deckRepo, cardRepo)
 	cardSvc := service.NewCardService(cardRepo, deckRepo)
 	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, cfg.FSRS)
-	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo)
+	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, quizAttemptRepo)
+	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo, userRepo, reviewRepo, cfg.FSRS)
 
-	// Repositories (media)
-	mediaRepo := repository.NewMediaRepository(pool)
+	r2Client := storage.NewR2Client(cfg.R2.AccountID, cfg.R2.AccessKeyID, cfg.R2.SecretAccessKey, cfg.R2.BucketName, cfg.R2.PublicURL)
+	mediaSvc := service.NewMediaService(mediaRepo, cardRepo, deckRepo, r2Client, cfg.R2)
+	goalSvc := service.NewGoalService(goalRepo, reviewRepo)
 
 	// Handlers
 	healthH := handler.NewHealthHandler(pool)
 	authH := handler.NewAuthHandler(authSvc, oauthSvc)
-	mediaH := handler.NewMediaHandler(mediaSvc, mediaRepo)
 	deckH := handler.NewDeckHandler(deckSvc)
 	cardH := handler.NewCardHandler(cardSvc)
 	studyH := handler.NewStudyHandler(studySvc)
 	statsH := handler.NewStatsHandler(statsSvc)
+	quizH := handler.NewQuizHandler(quizSvc)
+	mediaH := handler.NewMediaHandler(mediaSvc)
+	goalH := handler.NewGoalHandler(goalSvc)
 
 	// Router
 	r := chi.NewRouter()
@@ -173,7 +181,14 @@ func run() error {
 				r.Put("/", cardH.Update)
 				r.Delete("/", cardH.Delete)
 				r.Put("/suspend", cardH.Suspend)
+
+				// Media
+				r.Post("/media", mediaH.Upload)
+				r.Get("/media", mediaH.ListByCard)
 			})
+
+			// Media (direct access)
+			r.Delete("/media/{mediaID}", mediaH.Delete)
 
 			// Study
 			r.Route("/study", func(r chi.Router) {
@@ -189,13 +204,49 @@ func run() error {
 				r.Get("/overview", statsH.Overview)
 				r.Get("/heatmap", statsH.Heatmap)
 				r.Get("/forecast", statsH.Forecast)
+				r.Get("/leaderboard", statsH.Leaderboard)
+				r.Get("/mastery", statsH.Mastery)
+				r.Get("/weak-areas", statsH.WeakAreas)
+				r.Get("/test-comparison/{deckID}", statsH.TestComparison)
 				r.Get("/deck/{deckID}", statsH.DeckStats)
 			})
 
-			// Media
-			r.Route("/media", func(r chi.Router) {
-				r.Post("/upload", mediaH.Upload)
-				r.Delete("/{mediaID}", mediaH.Delete)
+			// Goals
+			r.Route("/goals", func(r chi.Router) {
+				r.Post("/", goalH.SetGoal)
+				r.Get("/", goalH.ListWithProgress)
+				r.Delete("/{goalID}", goalH.DeleteGoal)
+			})
+
+			// Quizzes
+			r.Route("/quizzes", func(r chi.Router) {
+				r.Get("/", quizH.ListQuizzes)
+				r.Post("/", quizH.CreateQuiz)
+
+				r.Route("/{quizID}", func(r chi.Router) {
+					r.Get("/", quizH.GetQuiz)
+					r.Put("/", quizH.UpdateQuiz)
+					r.Delete("/", quizH.DeleteQuiz)
+
+					// Questions
+					r.Route("/questions", func(r chi.Router) {
+						r.Post("/", quizH.AddQuestion)
+						r.Post("/batch", quizH.BatchAddQuestions)
+						r.Post("/generate", quizH.GenerateFromDeck)
+						r.Post("/generate-ayat", quizH.GenerateAyatQuiz)
+						r.Put("/{questionID}", quizH.UpdateQuestion)
+						r.Delete("/{questionID}", quizH.DeleteQuestion)
+					})
+
+					// Attempts
+					r.Route("/attempts", func(r chi.Router) {
+						r.Post("/", quizH.StartAttempt)
+						r.Get("/", quizH.ListAttempts)
+						r.Get("/{attemptID}", quizH.GetAttempt)
+						r.Post("/{attemptID}/answer", quizH.SubmitAnswer)
+						r.Put("/{attemptID}/complete", quizH.CompleteAttempt)
+					})
+				})
 			})
 		})
 	})

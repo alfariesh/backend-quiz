@@ -17,4 +17,11 @@ var (
 	ErrDailyLimitReached = errors.New("daily limit reached")
 	ErrFileTooLarge      = errors.New("file too large")
 	ErrUnsupportedMedia  = errors.New("unsupported media type")
+
+	// Quiz errors
+	ErrAttemptCompleted  = errors.New("quiz attempt already completed")
+	ErrQuestionNotInQuiz = errors.New("question does not belong to this quiz")
+	ErrAlreadyAnswered   = errors.New("question already answered in this attempt")
+	ErrQuizNotPublished  = errors.New("quiz is not published")
+	ErrInsufficientCards = errors.New("not enough cards to generate quiz")
 )

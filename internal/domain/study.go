@@ -37,10 +37,18 @@ type DailyStats struct {
 	RetentionRate   *float64  `json:"retention_rate,omitempty"`
 }
 
+type LeaderboardEntry struct {
+	UserID      uuid.UUID `json:"user_id"`
+	DisplayName string    `json:"display_name"`
+	Streak      int       `json:"streak"`
+	Rank        int       `json:"rank"`
+}
+
 type StatsRepository interface {
 	UpsertDailyStats(ctx context.Context, stats *DailyStats) error
 	GetDailyStats(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]DailyStats, error)
 	GetStreak(ctx context.Context, userID uuid.UUID) (int, error)
+	GetGlobalLeaderboard(ctx context.Context, limit int) ([]LeaderboardEntry, error)
 }
 
 type Media struct {

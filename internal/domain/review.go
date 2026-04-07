@@ -7,6 +7,11 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	ReviewSourceFlashcard = "flashcard"
+	ReviewSourceQuiz      = "quiz"
+)
+
 type ReviewLog struct {
 	ID            uuid.UUID `json:"id"`
 	CardID        uuid.UUID `json:"card_id"`
@@ -18,6 +23,7 @@ type ReviewLog struct {
 	Stability     float64   `json:"stability"`
 	Difficulty    float64   `json:"difficulty"`
 	DurationMS    int       `json:"duration_ms"`
+	Source        string    `json:"source"`
 	ReviewedAt    time.Time `json:"reviewed_at"`
 }
 

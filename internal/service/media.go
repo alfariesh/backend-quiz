@@ -4,126 +4,153 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path"
+	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 
 	"github.com/rekanesiads/backend-quiz/config"
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/pkg/storage"
 )
 
-var allowedMimeTypes = map[string]bool{
-	"image/jpeg": true,
-	"image/png":  true,
-	"image/gif":  true,
-	"image/webp": true,
+var allowedMediaTypes = map[string]bool{
+	// Audio
 	"audio/mpeg": true,
-	"audio/mp4":  true,
-	"audio/ogg":  true,
 	"audio/wav":  true,
+	"audio/ogg":  true,
+	"audio/mp4":  true,
+	"audio/webm": true,
+	// Images
+	"image/jpeg":    true,
+	"image/png":     true,
+	"image/gif":     true,
+	"image/webp":    true,
+	"image/svg+xml": true,
 }
 
 type MediaService struct {
-	client        *s3.Client
-	bucketName    string
-	publicURL     string
-	maxFileSizeMB int
+	mediaRepo domain.MediaRepository
+	cardRepo  domain.CardRepository
+	deckRepo  domain.DeckRepository
+	r2        *storage.R2Client
+	r2Config  config.R2Config
 }
 
-func NewMediaService(cfg config.R2Config) *MediaService {
-	if cfg.AccountID == "" {
-		// R2 not configured, return a no-op service
-		return &MediaService{maxFileSizeMB: cfg.MaxFileSizeMB}
-	}
-
-	r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) {
-		return aws.Endpoint{
-			URL: fmt.Sprintf("https://%s.r2.cloudflarestorage.com", cfg.AccountID),
-		}, nil
-	})
-
-	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(),
-		awsconfig.WithEndpointResolverWithOptions(r2Resolver),
-		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-			cfg.AccessKeyID, cfg.SecretAccessKey, "",
-		)),
-		awsconfig.WithRegion("auto"),
-	)
-	if err != nil {
-		// Log error but don't crash; media upload will fail gracefully
-		return &MediaService{maxFileSizeMB: cfg.MaxFileSizeMB}
-	}
-
-	client := s3.NewFromConfig(awsCfg)
-
+func NewMediaService(
+	mediaRepo domain.MediaRepository,
+	cardRepo domain.CardRepository,
+	deckRepo domain.DeckRepository,
+	r2 *storage.R2Client,
+	r2Config config.R2Config,
+) *MediaService {
 	return &MediaService{
-		client:        client,
-		bucketName:    cfg.BucketName,
-		publicURL:     strings.TrimRight(cfg.PublicURL, "/"),
-		maxFileSizeMB: cfg.MaxFileSizeMB,
+		mediaRepo: mediaRepo,
+		cardRepo:  cardRepo,
+		deckRepo:  deckRepo,
+		r2:        r2,
+		r2Config:  r2Config,
 	}
 }
 
-func (s *MediaService) Upload(ctx context.Context, userID uuid.UUID, fileName, mimeType string, fileSize int64, body io.Reader) (*domain.Media, error) {
-	if s.client == nil {
-		return nil, fmt.Errorf("media storage not configured")
+type UploadMediaRequest struct {
+	FileName    string
+	FileSize    int
+	ContentType string
+	Body        io.Reader
+}
+
+func (s *MediaService) Upload(ctx context.Context, userID, cardID uuid.UUID, req UploadMediaRequest) (*domain.Media, error) {
+	// Validate card ownership
+	card, err := s.cardRepo.GetByID(ctx, cardID)
+	if err != nil {
+		return nil, err
+	}
+	deck, err := s.deckRepo.GetByID(ctx, card.DeckID)
+	if err != nil {
+		return nil, err
+	}
+	if deck.UserID != userID {
+		return nil, domain.ErrForbidden
 	}
 
-	if !allowedMimeTypes[mimeType] {
-		return nil, domain.ErrUnsupportedMedia
-	}
-
-	maxBytes := int64(s.maxFileSizeMB) * 1024 * 1024
-	if fileSize > maxBytes {
+	// Validate file size
+	maxBytes := s.r2Config.MaxFileSizeMB * 1024 * 1024
+	if req.FileSize > maxBytes {
 		return nil, domain.ErrFileTooLarge
 	}
 
-	ext := path.Ext(fileName)
-	objectKey := fmt.Sprintf("media/%s/%s/%s%s",
-		userID.String(),
-		time.Now().Format("2006/01/02"),
-		uuid.New().String(),
-		ext,
-	)
-
-	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(s.bucketName),
-		Key:         aws.String(objectKey),
-		Body:        body,
-		ContentType: aws.String(mimeType),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("uploading to R2: %w", err)
+	// Validate content type
+	if !allowedMediaTypes[strings.ToLower(req.ContentType)] {
+		return nil, domain.ErrUnsupportedMedia
 	}
 
-	publicURL := fmt.Sprintf("%s/%s", s.publicURL, objectKey)
+	// Generate R2 key
+	ext := filepath.Ext(req.FileName)
+	if ext == "" {
+		if strings.HasPrefix(req.ContentType, "audio/") {
+			ext = ".mp3"
+		} else {
+			ext = ".bin"
+		}
+	}
+	fileID := uuid.New()
+	r2Key := fmt.Sprintf("media/%s/%s%s", userID.String(), fileID.String(), ext)
 
+	// Upload to R2
+	url, err := s.r2.Upload(ctx, r2Key, req.Body, req.ContentType)
+	if err != nil {
+		return nil, fmt.Errorf("uploading file: %w", err)
+	}
+
+	// Save to database
 	media := &domain.Media{
 		UserID:   userID,
-		FileName: fileName,
-		FileSize: int(fileSize),
-		MimeType: mimeType,
-		R2Key:    objectKey,
-		URL:      publicURL,
+		CardID:   &cardID,
+		FileName: req.FileName,
+		FileSize: req.FileSize,
+		MimeType: req.ContentType,
+		R2Key:    r2Key,
+		URL:      url,
+	}
+	if err := s.mediaRepo.Create(ctx, media); err != nil {
+		// Clean up R2 on DB failure
+		_ = s.r2.Delete(ctx, r2Key)
+		return nil, err
 	}
 
 	return media, nil
 }
 
-func (s *MediaService) Delete(ctx context.Context, r2Key string) error {
-	if s.client == nil {
-		return fmt.Errorf("media storage not configured")
+func (s *MediaService) Delete(ctx context.Context, userID, mediaID uuid.UUID) error {
+	media, err := s.mediaRepo.GetByID(ctx, mediaID)
+	if err != nil {
+		return err
+	}
+	if media.UserID != userID {
+		return domain.ErrForbidden
 	}
 
-	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(s.bucketName),
-		Key:    aws.String(r2Key),
-	})
-	return err
+	// Delete from R2
+	if err := s.r2.Delete(ctx, media.R2Key); err != nil {
+		return fmt.Errorf("deleting file: %w", err)
+	}
+
+	return s.mediaRepo.Delete(ctx, mediaID)
+}
+
+func (s *MediaService) ListByCard(ctx context.Context, userID, cardID uuid.UUID) ([]domain.Media, error) {
+	card, err := s.cardRepo.GetByID(ctx, cardID)
+	if err != nil {
+		return nil, err
+	}
+	deck, err := s.deckRepo.GetByID(ctx, card.DeckID)
+	if err != nil {
+		return nil, err
+	}
+	if deck.UserID != userID {
+		return nil, domain.ErrForbidden
+	}
+
+	return s.mediaRepo.ListByCardID(ctx, cardID)
 }
