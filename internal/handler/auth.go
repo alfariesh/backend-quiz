@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
@@ -9,11 +11,12 @@ import (
 )
 
 type AuthHandler struct {
-	authSvc *service.AuthService
+	authSvc  *service.AuthService
+	oauthSvc *service.OAuthService
 }
 
-func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
-	return &AuthHandler{authSvc: authSvc}
+func NewAuthHandler(authSvc *service.AuthService, oauthSvc *service.OAuthService) *AuthHandler {
+	return &AuthHandler{authSvc: authSvc, oauthSvc: oauthSvc}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -126,11 +129,66 @@ func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) GoogleRedirect(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement Google OAuth redirect
-	JSONError(w, http.StatusNotImplemented, "Google OAuth not configured")
+	b := make([]byte, 16)
+	rand.Read(b)
+	state := hex.EncodeToString(b)
+
+	// In production, store state in a secure cookie or session for CSRF validation
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		Path:     "/",
+		MaxAge:   600,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	url := h.oauthSvc.GetAuthURL(state)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement Google OAuth callback
-	JSONError(w, http.StatusNotImplemented, "Google OAuth not configured")
+	// Verify state parameter for CSRF protection
+	stateCookie, err := r.Cookie("oauth_state")
+	if err != nil || stateCookie.Value != r.URL.Query().Get("state") {
+		JSONError(w, http.StatusBadRequest, "invalid state parameter")
+		return
+	}
+
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		JSONError(w, http.StatusBadRequest, "missing authorization code")
+		return
+	}
+
+	// Exchange code for Google user info
+	googleUser, err := h.oauthSvc.ExchangeCode(r.Context(), code)
+	if err != nil {
+		JSONError(w, http.StatusBadGateway, "failed to authenticate with Google")
+		return
+	}
+
+	// Find or create user
+	var avatarURL *string
+	if googleUser.Picture != "" {
+		avatarURL = &googleUser.Picture
+	}
+
+	tokens, user, err := h.authSvc.FindOrCreateOAuthUser(
+		r.Context(),
+		"google",
+		googleUser.ID,
+		googleUser.Email,
+		googleUser.Name,
+		avatarURL,
+	)
+	if err != nil {
+		HandleError(w, err)
+		return
+	}
+
+	JSON(w, http.StatusOK, map[string]any{
+		"tokens": tokens,
+		"user":   user,
+	})
 }

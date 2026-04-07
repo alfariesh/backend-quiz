@@ -20,6 +20,7 @@ import (
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
 	"github.com/rekanesiads/backend-quiz/internal/repository"
 	"github.com/rekanesiads/backend-quiz/internal/service"
+	appOtel "github.com/rekanesiads/backend-quiz/pkg/otel"
 )
 
 func main() {
@@ -43,6 +44,17 @@ func run() error {
 	}
 	logger := slog.New(slogzerolog.Option{Logger: &zl}.NewZerologHandler())
 	slog.SetDefault(logger)
+
+	// OpenTelemetry
+	otelShutdown, err := appOtel.Setup(context.Background(), appOtel.Config{
+		Enabled:     cfg.OTEL.Enabled,
+		ExporterURL: cfg.OTEL.ExporterURL,
+		ServiceName: cfg.OTEL.ServiceName,
+	})
+	if err != nil {
+		return fmt.Errorf("setting up OpenTelemetry: %w", err)
+	}
+	defer otelShutdown(context.Background())
 
 	// Database pool
 	ctx := context.Background()
@@ -75,14 +87,20 @@ func run() error {
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.RefreshDuration)
+	oauthSvc := service.NewOAuthService(cfg.GoogleOAuth)
+	mediaSvc := service.NewMediaService(cfg.R2)
 	deckSvc := service.NewDeckService(deckRepo, cardRepo)
 	cardSvc := service.NewCardService(cardRepo, deckRepo)
 	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, cfg.FSRS)
 	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo)
 
+	// Repositories (media)
+	mediaRepo := repository.NewMediaRepository(pool)
+
 	// Handlers
 	healthH := handler.NewHealthHandler(pool)
-	authH := handler.NewAuthHandler(authSvc)
+	authH := handler.NewAuthHandler(authSvc, oauthSvc)
+	mediaH := handler.NewMediaHandler(mediaSvc, mediaRepo)
 	deckH := handler.NewDeckHandler(deckSvc)
 	cardH := handler.NewCardHandler(cardSvc)
 	studyH := handler.NewStudyHandler(studySvc)
@@ -93,6 +111,9 @@ func run() error {
 
 	// Global middleware
 	rl := middleware.NewRateLimiter(10, 20)
+	if cfg.OTEL.Enabled {
+		r.Use(middleware.Tracing(cfg.OTEL.ServiceName))
+	}
 	r.Use(middleware.Recovery(logger))
 	r.Use(middleware.Logging(logger))
 	r.Use(middleware.CORS)
@@ -169,6 +190,12 @@ func run() error {
 				r.Get("/heatmap", statsH.Heatmap)
 				r.Get("/forecast", statsH.Forecast)
 				r.Get("/deck/{deckID}", statsH.DeckStats)
+			})
+
+			// Media
+			r.Route("/media", func(r chi.Router) {
+				r.Post("/upload", mediaH.Upload)
+				r.Delete("/{mediaID}", mediaH.Delete)
 			})
 		})
 	})

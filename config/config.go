@@ -14,6 +14,13 @@ type Config struct {
 	GoogleOAuth GoogleOAuthConfig
 	R2          R2Config
 	FSRS        FSRSConfig
+	OTEL        OTELConfig
+}
+
+type OTELConfig struct {
+	Enabled     bool   `envconfig:"OTEL_ENABLED" default:"false"`
+	ExporterURL string `envconfig:"OTEL_EXPORTER_URL" default:"localhost:4317"`
+	ServiceName string `envconfig:"OTEL_SERVICE_NAME" default:"flashcard-api"`
 }
 
 type ServerConfig struct {
