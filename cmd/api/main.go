@@ -72,6 +72,8 @@ func run() error {
 	reviewRepo := repository.NewReviewRepository(pool)
 	sessionRepo := repository.NewStudySessionRepository(pool)
 	statsRepo := repository.NewStatsRepository(pool)
+	quizRepo := repository.NewQuizRepository(pool)
+	quizAttemptRepo := repository.NewQuizAttemptRepository(pool)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.RefreshDuration)
@@ -79,6 +81,7 @@ func run() error {
 	cardSvc := service.NewCardService(cardRepo, deckRepo)
 	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, cfg.FSRS)
 	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo)
+	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo)
 
 	// Handlers
 	healthH := handler.NewHealthHandler(pool)
@@ -87,6 +90,7 @@ func run() error {
 	cardH := handler.NewCardHandler(cardSvc)
 	studyH := handler.NewStudyHandler(studySvc)
 	statsH := handler.NewStatsHandler(statsSvc)
+	quizH := handler.NewQuizHandler(quizSvc)
 
 	// Router
 	r := chi.NewRouter()
@@ -169,6 +173,36 @@ func run() error {
 				r.Get("/heatmap", statsH.Heatmap)
 				r.Get("/forecast", statsH.Forecast)
 				r.Get("/deck/{deckID}", statsH.DeckStats)
+			})
+
+			// Quizzes
+			r.Route("/quizzes", func(r chi.Router) {
+				r.Get("/", quizH.ListQuizzes)
+				r.Post("/", quizH.CreateQuiz)
+
+				r.Route("/{quizID}", func(r chi.Router) {
+					r.Get("/", quizH.GetQuiz)
+					r.Put("/", quizH.UpdateQuiz)
+					r.Delete("/", quizH.DeleteQuiz)
+
+					// Questions
+					r.Route("/questions", func(r chi.Router) {
+						r.Post("/", quizH.AddQuestion)
+						r.Post("/batch", quizH.BatchAddQuestions)
+						r.Post("/generate", quizH.GenerateFromDeck)
+						r.Put("/{questionID}", quizH.UpdateQuestion)
+						r.Delete("/{questionID}", quizH.DeleteQuestion)
+					})
+
+					// Attempts
+					r.Route("/attempts", func(r chi.Router) {
+						r.Post("/", quizH.StartAttempt)
+						r.Get("/", quizH.ListAttempts)
+						r.Get("/{attemptID}", quizH.GetAttempt)
+						r.Post("/{attemptID}/answer", quizH.SubmitAnswer)
+						r.Put("/{attemptID}/complete", quizH.CompleteAttempt)
+					})
+				})
 			})
 		})
 	})
