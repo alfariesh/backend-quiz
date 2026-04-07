@@ -20,6 +20,7 @@ import (
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
 	"github.com/rekanesiads/backend-quiz/internal/repository"
 	"github.com/rekanesiads/backend-quiz/internal/service"
+	"github.com/rekanesiads/backend-quiz/pkg/storage"
 )
 
 func main() {
@@ -74,6 +75,7 @@ func run() error {
 	statsRepo := repository.NewStatsRepository(pool)
 	quizRepo := repository.NewQuizRepository(pool)
 	quizAttemptRepo := repository.NewQuizAttemptRepository(pool)
+	mediaRepo := repository.NewMediaRepository(pool)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.RefreshDuration)
@@ -83,6 +85,9 @@ func run() error {
 	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo)
 	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo, userRepo, reviewRepo, cfg.FSRS)
 
+	r2Client := storage.NewR2Client(cfg.R2.AccountID, cfg.R2.AccessKeyID, cfg.R2.SecretAccessKey, cfg.R2.BucketName, cfg.R2.PublicURL)
+	mediaSvc := service.NewMediaService(mediaRepo, cardRepo, deckRepo, r2Client, cfg.R2)
+
 	// Handlers
 	healthH := handler.NewHealthHandler(pool)
 	authH := handler.NewAuthHandler(authSvc)
@@ -91,6 +96,7 @@ func run() error {
 	studyH := handler.NewStudyHandler(studySvc)
 	statsH := handler.NewStatsHandler(statsSvc)
 	quizH := handler.NewQuizHandler(quizSvc)
+	mediaH := handler.NewMediaHandler(mediaSvc)
 
 	// Router
 	r := chi.NewRouter()
@@ -156,7 +162,14 @@ func run() error {
 				r.Put("/", cardH.Update)
 				r.Delete("/", cardH.Delete)
 				r.Put("/suspend", cardH.Suspend)
+
+				// Media
+				r.Post("/media", mediaH.Upload)
+				r.Get("/media", mediaH.ListByCard)
 			})
+
+			// Media (direct access)
+			r.Delete("/media/{mediaID}", mediaH.Delete)
 
 			// Study
 			r.Route("/study", func(r chi.Router) {
@@ -172,6 +185,7 @@ func run() error {
 				r.Get("/overview", statsH.Overview)
 				r.Get("/heatmap", statsH.Heatmap)
 				r.Get("/forecast", statsH.Forecast)
+				r.Get("/leaderboard", statsH.Leaderboard)
 				r.Get("/deck/{deckID}", statsH.DeckStats)
 			})
 
