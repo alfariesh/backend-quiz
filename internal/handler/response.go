@@ -51,7 +51,12 @@ func HandleError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrCardSuspended),
 		errors.Is(err, domain.ErrSessionEnded),
 		errors.Is(err, domain.ErrFileTooLarge),
-		errors.Is(err, domain.ErrUnsupportedMedia):
+		errors.Is(err, domain.ErrUnsupportedMedia),
+		errors.Is(err, domain.ErrAttemptCompleted),
+		errors.Is(err, domain.ErrQuestionNotInQuiz),
+		errors.Is(err, domain.ErrAlreadyAnswered),
+		errors.Is(err, domain.ErrQuizNotPublished),
+		errors.Is(err, domain.ErrInsufficientCards):
 		JSONError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, domain.ErrDailyLimitReached):
 		JSONError(w, http.StatusTooManyRequests, err.Error())

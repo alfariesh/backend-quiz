@@ -72,3 +72,48 @@ func (r *StatsRepository) GetStreak(ctx context.Context, userID uuid.UUID) (int,
 	).Scan(&streak)
 	return streak, err
 }
+
+func (r *StatsRepository) GetGlobalLeaderboard(ctx context.Context, limit int) ([]domain.LeaderboardEntry, error) {
+	rows, err := r.db.Query(ctx,
+		`WITH user_streaks AS (
+			SELECT user_id,
+				date,
+				date - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY date DESC))::int * INTERVAL '1 day' AS grp
+			FROM daily_stats
+			WHERE reviews > 0
+		),
+		current_streaks AS (
+			SELECT user_id, COUNT(*)::int AS streak
+			FROM user_streaks
+			WHERE grp = (
+				SELECT grp FROM user_streaks us2
+				WHERE us2.user_id = user_streaks.user_id
+				ORDER BY date DESC LIMIT 1
+			)
+			GROUP BY user_id
+		)
+		SELECT cs.user_id, u.display_name, cs.streak
+		FROM current_streaks cs
+		JOIN users u ON u.id = cs.user_id
+		WHERE cs.streak > 0
+		ORDER BY cs.streak DESC, u.display_name
+		LIMIT $1`, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []domain.LeaderboardEntry
+	rank := 0
+	for rows.Next() {
+		rank++
+		var e domain.LeaderboardEntry
+		if err := rows.Scan(&e.UserID, &e.DisplayName, &e.Streak); err != nil {
+			return nil, err
+		}
+		e.Rank = rank
+		entries = append(entries, e)
+	}
+	return entries, nil
+}

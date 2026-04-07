@@ -21,11 +21,14 @@ func NewCardRepository(db *pgxpool.Pool) *CardRepository {
 }
 
 func (r *CardRepository) Create(ctx context.Context, card *domain.Card) error {
+	if card.ContentType == "" {
+		card.ContentType = domain.ContentTypePlain
+	}
 	return r.db.QueryRow(ctx,
-		`INSERT INTO cards (deck_id, front, back, tags, position)
-		VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO cards (deck_id, front, back, content_type, tags, position)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, is_suspended, created_at, updated_at`,
-		card.DeckID, card.Front, card.Back, card.Tags, card.Position,
+		card.DeckID, card.Front, card.Back, card.ContentType, card.Tags, card.Position,
 	).Scan(&card.ID, &card.Due, &card.Stability, &card.Difficulty, &card.ElapsedDays,
 		&card.ScheduledDays, &card.Reps, &card.Lapses, &card.State, &card.LastReview,
 		&card.IsSuspended, &card.CreatedAt, &card.UpdatedAt)
@@ -39,11 +42,14 @@ func (r *CardRepository) BulkCreate(ctx context.Context, cards []*domain.Card) e
 	defer tx.Rollback(ctx)
 
 	for _, card := range cards {
+		if card.ContentType == "" {
+			card.ContentType = domain.ContentTypePlain
+		}
 		err := tx.QueryRow(ctx,
-			`INSERT INTO cards (deck_id, front, back, tags, position)
-			VALUES ($1, $2, $3, $4, $5)
+			`INSERT INTO cards (deck_id, front, back, content_type, tags, position)
+			VALUES ($1, $2, $3, $4, $5, $6)
 			RETURNING id, due, created_at, updated_at`,
-			card.DeckID, card.Front, card.Back, card.Tags, card.Position,
+			card.DeckID, card.Front, card.Back, card.ContentType, card.Tags, card.Position,
 		).Scan(&card.ID, &card.Due, &card.CreatedAt, &card.UpdatedAt)
 		if err != nil {
 			return err
@@ -56,9 +62,9 @@ func (r *CardRepository) BulkCreate(ctx context.Context, cards []*domain.Card) e
 func (r *CardRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Card, error) {
 	var c domain.Card
 	err := r.db.QueryRow(ctx,
-		`SELECT id, deck_id, front, back, tags, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, is_suspended, position, created_at, updated_at
+		`SELECT id, deck_id, front, back, content_type, tags, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, is_suspended, position, created_at, updated_at
 		FROM cards WHERE id = $1`, id,
-	).Scan(&c.ID, &c.DeckID, &c.Front, &c.Back, &c.Tags, &c.Due, &c.Stability, &c.Difficulty,
+	).Scan(&c.ID, &c.DeckID, &c.Front, &c.Back, &c.ContentType, &c.Tags, &c.Due, &c.Stability, &c.Difficulty,
 		&c.ElapsedDays, &c.ScheduledDays, &c.Reps, &c.Lapses, &c.State, &c.LastReview,
 		&c.IsSuspended, &c.Position, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -83,7 +89,7 @@ func (r *CardRepository) ListByDeckID(ctx context.Context, deckID uuid.UUID, fil
 	}
 
 	rows, err := r.db.Query(ctx,
-		`SELECT id, deck_id, front, back, tags, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, is_suspended, position, created_at, updated_at
+		`SELECT id, deck_id, front, back, content_type, tags, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, is_suspended, position, created_at, updated_at
 		FROM cards
 		WHERE deck_id = $1
 			AND ($2::smallint IS NULL OR state = $2)
@@ -121,8 +127,8 @@ func (r *CardRepository) ListByDeckID(ctx context.Context, deckID uuid.UUID, fil
 
 func (r *CardRepository) Update(ctx context.Context, card *domain.Card) error {
 	_, err := r.db.Exec(ctx,
-		`UPDATE cards SET front=$2, back=$3, tags=$4, updated_at=now() WHERE id = $1`,
-		card.ID, card.Front, card.Back, card.Tags,
+		`UPDATE cards SET front=$2, back=$3, content_type=$4, tags=$5, updated_at=now() WHERE id = $1`,
+		card.ID, card.Front, card.Back, card.ContentType, card.Tags,
 	)
 	return err
 }
@@ -157,7 +163,7 @@ func (r *CardRepository) ResetFSRS(ctx context.Context, id uuid.UUID) error {
 
 func (r *CardRepository) GetDueCards(ctx context.Context, deckID uuid.UUID, now time.Time, newLimit, reviewLimit int) ([]domain.Card, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, deck_id, front, back, tags, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, is_suspended, position, created_at, updated_at
+		`SELECT id, deck_id, front, back, content_type, tags, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, is_suspended, position, created_at, updated_at
 		FROM cards
 		WHERE deck_id = $1 AND NOT is_suspended
 			AND (
@@ -229,4 +235,44 @@ func (r *CardRepository) CountDue(ctx context.Context, deckID uuid.UUID, now tim
 		deckID, now,
 	).Scan(&count)
 	return count, err
+}
+
+func (r *CardRepository) GetDeckMasteryStats(ctx context.Context, deckID uuid.UUID) (totalCards, matureCards int, avgStability float64, err error) {
+	err = r.db.QueryRow(ctx,
+		`SELECT
+			COUNT(*)::int AS total,
+			COUNT(*) FILTER (WHERE state = 2)::int AS mature,
+			COALESCE(AVG(stability), 0) AS avg_stability
+		FROM cards
+		WHERE deck_id = $1 AND NOT is_suspended`, deckID,
+	).Scan(&totalCards, &matureCards, &avgStability)
+	return
+}
+
+func (r *CardRepository) GetWeakCards(ctx context.Context, userID uuid.UUID, limit int) ([]domain.Card, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT c.id, c.deck_id, c.front, c.back, c.tags, c.due, c.stability, c.difficulty, c.elapsed_days, c.scheduled_days, c.reps, c.lapses, c.state, c.last_review, c.is_suspended, c.position, c.created_at, c.updated_at
+		FROM cards c
+		JOIN decks d ON d.id = c.deck_id
+		WHERE d.user_id = $1 AND NOT c.is_suspended
+			AND (c.lapses > 2 OR (c.stability < 5 AND c.reps > 0))
+		ORDER BY c.lapses DESC, c.stability ASC
+		LIMIT $2`, userID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cards []domain.Card
+	for rows.Next() {
+		var c domain.Card
+		if err := rows.Scan(&c.ID, &c.DeckID, &c.Front, &c.Back, &c.Tags, &c.Due, &c.Stability, &c.Difficulty,
+			&c.ElapsedDays, &c.ScheduledDays, &c.Reps, &c.Lapses, &c.State, &c.LastReview,
+			&c.IsSuspended, &c.Position, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		cards = append(cards, c)
+	}
+	return cards, nil
 }

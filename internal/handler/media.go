@@ -6,64 +6,72 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/rekanesiads/backend-quiz/internal/domain"
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
-	"github.com/rekanesiads/backend-quiz/internal/repository"
 	"github.com/rekanesiads/backend-quiz/internal/service"
 )
 
 type MediaHandler struct {
-	mediaSvc  *service.MediaService
-	mediaRepo *repository.MediaRepository
+	mediaSvc *service.MediaService
 }
 
-func NewMediaHandler(mediaSvc *service.MediaService, mediaRepo *repository.MediaRepository) *MediaHandler {
-	return &MediaHandler{mediaSvc: mediaSvc, mediaRepo: mediaRepo}
+func NewMediaHandler(mediaSvc *service.MediaService) *MediaHandler {
+	return &MediaHandler{mediaSvc: mediaSvc}
 }
 
 func (h *MediaHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
+	cardID, err := uuid.Parse(chi.URLParam(r, "cardID"))
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid card id")
+		return
+	}
 
-	// Max 10MB
-	r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
-
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		JSONError(w, http.StatusBadRequest, "file too large or invalid form data")
+	// Parse multipart form (max 10MB + overhead)
+	if err := r.ParseMultipartForm(11 << 20); err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid multipart form")
 		return
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		JSONError(w, http.StatusBadRequest, "missing file field")
+		JSONError(w, http.StatusBadRequest, "file field is required")
 		return
 	}
 	defer file.Close()
 
-	mimeType := header.Header.Get("Content-Type")
-	if mimeType == "" {
-		mimeType = "application/octet-stream"
+	req := service.UploadMediaRequest{
+		FileName:    header.Filename,
+		FileSize:    int(header.Size),
+		ContentType: header.Header.Get("Content-Type"),
+		Body:        file,
 	}
 
-	// Upload to R2
-	media, err := h.mediaSvc.Upload(r.Context(), userID, header.Filename, mimeType, header.Size, file)
+	media, err := h.mediaSvc.Upload(r.Context(), userID, cardID, req)
 	if err != nil {
 		HandleError(w, err)
 		return
 	}
+	JSON(w, http.StatusCreated, media)
+}
 
-	// Optionally link to card
-	if cardIDStr := r.FormValue("card_id"); cardIDStr != "" {
-		if cardID, err := uuid.Parse(cardIDStr); err == nil {
-			media.CardID = &cardID
-		}
-	}
-
-	// Save to database
-	if err := h.mediaRepo.Create(r.Context(), media); err != nil {
-		HandleError(w, err)
+func (h *MediaHandler) ListByCard(w http.ResponseWriter, r *http.Request) {
+	userID, _ := middleware.GetUserID(r.Context())
+	cardID, err := uuid.Parse(chi.URLParam(r, "cardID"))
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid card id")
 		return
 	}
 
-	JSON(w, http.StatusCreated, media)
+	media, err := h.mediaSvc.ListByCard(r.Context(), userID, cardID)
+	if err != nil {
+		HandleError(w, err)
+		return
+	}
+	if media == nil {
+		media = []domain.Media{}
+	}
+	JSON(w, http.StatusOK, media)
 }
 
 func (h *MediaHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -74,28 +82,9 @@ func (h *MediaHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	media, err := h.mediaRepo.GetByID(r.Context(), mediaID)
-	if err != nil {
+	if err := h.mediaSvc.Delete(r.Context(), userID, mediaID); err != nil {
 		HandleError(w, err)
 		return
 	}
-
-	if media.UserID != userID {
-		JSONError(w, http.StatusForbidden, "forbidden")
-		return
-	}
-
-	// Delete from R2
-	if err := h.mediaSvc.Delete(r.Context(), media.R2Key); err != nil {
-		JSONError(w, http.StatusInternalServerError, "failed to delete file")
-		return
-	}
-
-	// Delete from database
-	if err := h.mediaRepo.Delete(r.Context(), mediaID); err != nil {
-		HandleError(w, err)
-		return
-	}
-
 	JSONMessage(w, http.StatusOK, "media deleted")
 }

@@ -18,15 +18,17 @@ func NewCardService(cardRepo domain.CardRepository, deckRepo domain.DeckReposito
 }
 
 type CreateCardRequest struct {
-	Front string   `json:"front" validate:"required,min=1"`
-	Back  string   `json:"back" validate:"required,min=1"`
-	Tags  []string `json:"tags"`
+	Front       string   `json:"front" validate:"required,min=1"`
+	Back        string   `json:"back" validate:"required,min=1"`
+	ContentType string   `json:"content_type,omitempty" validate:"omitempty,oneof=plain markdown html"`
+	Tags        []string `json:"tags"`
 }
 
 type UpdateCardRequest struct {
-	Front *string  `json:"front,omitempty" validate:"omitempty,min=1"`
-	Back  *string  `json:"back,omitempty" validate:"omitempty,min=1"`
-	Tags  []string `json:"tags,omitempty"`
+	Front       *string  `json:"front,omitempty" validate:"omitempty,min=1"`
+	Back        *string  `json:"back,omitempty" validate:"omitempty,min=1"`
+	ContentType *string  `json:"content_type,omitempty" validate:"omitempty,oneof=plain markdown html"`
+	Tags        []string `json:"tags,omitempty"`
 }
 
 type BatchCreateRequest struct {
@@ -51,11 +53,17 @@ func (s *CardService) Create(ctx context.Context, userID, deckID uuid.UUID, req 
 		tags = []string{}
 	}
 
+	contentType := req.ContentType
+	if contentType == "" {
+		contentType = domain.ContentTypePlain
+	}
+
 	card := &domain.Card{
-		DeckID: deckID,
-		Front:  req.Front,
-		Back:   req.Back,
-		Tags:   tags,
+		DeckID:      deckID,
+		Front:       req.Front,
+		Back:        req.Back,
+		ContentType: contentType,
+		Tags:        tags,
 	}
 
 	if err := s.cardRepo.Create(ctx, card); err != nil {
@@ -79,12 +87,17 @@ func (s *CardService) BatchCreate(ctx context.Context, userID, deckID uuid.UUID,
 		if tags == nil {
 			tags = []string{}
 		}
+		ct := c.ContentType
+		if ct == "" {
+			ct = domain.ContentTypePlain
+		}
 		cards[i] = &domain.Card{
-			DeckID:   deckID,
-			Front:    c.Front,
-			Back:     c.Back,
-			Tags:     tags,
-			Position: i,
+			DeckID:      deckID,
+			Front:       c.Front,
+			Back:        c.Back,
+			ContentType: ct,
+			Tags:        tags,
+			Position:    i,
 		}
 	}
 
@@ -130,6 +143,9 @@ func (s *CardService) Update(ctx context.Context, userID, cardID uuid.UUID, req 
 	}
 	if req.Back != nil {
 		card.Back = *req.Back
+	}
+	if req.ContentType != nil {
+		card.ContentType = *req.ContentType
 	}
 	if req.Tags != nil {
 		card.Tags = req.Tags

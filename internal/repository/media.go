@@ -48,7 +48,8 @@ func (r *MediaRepository) Delete(ctx context.Context, id uuid.UUID) error {
 func (r *MediaRepository) ListByCardID(ctx context.Context, cardID uuid.UUID) ([]domain.Media, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT id, user_id, card_id, file_name, file_size, mime_type, r2_key, url, created_at
-		FROM media WHERE card_id = $1 ORDER BY created_at`, cardID,
+		FROM media WHERE card_id = $1
+		ORDER BY created_at`, cardID,
 	)
 	if err != nil {
 		return nil, err
@@ -58,8 +59,7 @@ func (r *MediaRepository) ListByCardID(ctx context.Context, cardID uuid.UUID) ([
 	var media []domain.Media
 	for rows.Next() {
 		var m domain.Media
-		if err := rows.Scan(&m.ID, &m.UserID, &m.CardID, &m.FileName, &m.FileSize,
-			&m.MimeType, &m.R2Key, &m.URL, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.UserID, &m.CardID, &m.FileName, &m.FileSize, &m.MimeType, &m.R2Key, &m.URL, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		media = append(media, m)
