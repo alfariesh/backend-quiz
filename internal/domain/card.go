@@ -7,6 +7,12 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	ContentTypePlain    = "plain"
+	ContentTypeMarkdown = "markdown"
+	ContentTypeHTML     = "html"
+)
+
 type CardState int8
 
 const (
@@ -45,6 +51,7 @@ type Card struct {
 	DeckID      uuid.UUID  `json:"deck_id"`
 	Front       string     `json:"front"`
 	Back        string     `json:"back"`
+	ContentType string     `json:"content_type"`
 	Tags        []string   `json:"tags"`
 	IsSuspended bool       `json:"is_suspended"`
 	Position    int        `json:"position"`
