@@ -183,3 +183,27 @@ func (r *QuizRepository) CountQuestionsByQuizID(ctx context.Context, quizID uuid
 	err := r.db.QueryRow(ctx, `SELECT COUNT(*)::int FROM quiz_questions WHERE quiz_id = $1`, quizID).Scan(&count)
 	return count, err
 }
+
+func (r *QuizRepository) ListByDeckAndType(ctx context.Context, deckID uuid.UUID, quizType string) ([]domain.Quiz, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT id, user_id, deck_id, title, description, quiz_type, time_limit_seconds,
+			shuffle_questions, is_published, created_at, updated_at
+		FROM quizzes WHERE deck_id = $1 AND quiz_type = $2
+		ORDER BY created_at`, deckID, quizType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var quizzes []domain.Quiz
+	for rows.Next() {
+		var q domain.Quiz
+		if err := rows.Scan(&q.ID, &q.UserID, &q.DeckID, &q.Title, &q.Description, &q.QuizType,
+			&q.TimeLimitSeconds, &q.ShuffleQuestions, &q.IsPublished, &q.CreatedAt, &q.UpdatedAt); err != nil {
+			return nil, err
+		}
+		quizzes = append(quizzes, q)
+	}
+	return quizzes, nil
+}

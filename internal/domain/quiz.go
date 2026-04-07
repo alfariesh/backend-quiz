@@ -14,6 +14,8 @@ const (
 	QuizTypeFillBlank = "fill_blank"
 	QuizTypeMixed     = "mixed"
 	QuizTypeMixedAyat = "mixed_ayat"
+	QuizTypePretest   = "pretest"
+	QuizTypePosttest  = "posttest"
 )
 
 const (
@@ -107,6 +109,7 @@ type QuizRepository interface {
 	UpdateQuestion(ctx context.Context, q *QuizQuestion) error
 	DeleteQuestion(ctx context.Context, id uuid.UUID) error
 	CountQuestionsByQuizID(ctx context.Context, quizID uuid.UUID) (int, error)
+	ListByDeckAndType(ctx context.Context, deckID uuid.UUID, quizType string) ([]Quiz, error)
 }
 
 type QuizAttemptRepository interface {
@@ -119,4 +122,5 @@ type QuizAttemptRepository interface {
 	CreateAnswer(ctx context.Context, answer *QuizAnswer) error
 	ListAnswersByAttemptID(ctx context.Context, attemptID uuid.UUID) ([]QuizAnswer, error)
 	GetAnswerByAttemptAndQuestion(ctx context.Context, attemptID, questionID uuid.UUID) (*QuizAnswer, error)
+	GetBestAttemptByQuizID(ctx context.Context, quizID uuid.UUID) (*QuizAttempt, error)
 }

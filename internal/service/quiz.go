@@ -52,7 +52,7 @@ type CreateQuizRequest struct {
 	DeckID           *uuid.UUID `json:"deck_id,omitempty"`
 	Title            string     `json:"title" validate:"required,min=1,max=500"`
 	Description      string     `json:"description" validate:"max=2000"`
-	QuizType         string     `json:"quiz_type" validate:"required,oneof=mcq true_false fill_blank mixed mixed_ayat"`
+	QuizType         string     `json:"quiz_type" validate:"required,oneof=mcq true_false fill_blank mixed mixed_ayat pretest posttest"`
 	TimeLimitSeconds *int       `json:"time_limit_seconds,omitempty" validate:"omitempty,min=30,max=7200"`
 	ShuffleQuestions *bool      `json:"shuffle_questions,omitempty"`
 }
@@ -60,7 +60,7 @@ type CreateQuizRequest struct {
 type UpdateQuizRequest struct {
 	Title            *string `json:"title,omitempty" validate:"omitempty,min=1,max=500"`
 	Description      *string `json:"description,omitempty" validate:"omitempty,max=2000"`
-	QuizType         *string `json:"quiz_type,omitempty" validate:"omitempty,oneof=mcq true_false fill_blank mixed mixed_ayat"`
+	QuizType         *string `json:"quiz_type,omitempty" validate:"omitempty,oneof=mcq true_false fill_blank mixed mixed_ayat pretest posttest"`
 	TimeLimitSeconds *int    `json:"time_limit_seconds,omitempty" validate:"omitempty,min=30,max=7200"`
 	ShuffleQuestions *bool   `json:"shuffle_questions,omitempty"`
 	IsPublished      *bool   `json:"is_published,omitempty"`

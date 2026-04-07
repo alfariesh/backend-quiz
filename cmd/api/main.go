@@ -76,17 +76,19 @@ func run() error {
 	quizRepo := repository.NewQuizRepository(pool)
 	quizAttemptRepo := repository.NewQuizAttemptRepository(pool)
 	mediaRepo := repository.NewMediaRepository(pool)
+	goalRepo := repository.NewGoalRepository(pool)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.RefreshDuration)
 	deckSvc := service.NewDeckService(deckRepo, cardRepo)
 	cardSvc := service.NewCardService(cardRepo, deckRepo)
 	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, cfg.FSRS)
-	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo)
+	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, quizAttemptRepo)
 	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo, userRepo, reviewRepo, cfg.FSRS)
 
 	r2Client := storage.NewR2Client(cfg.R2.AccountID, cfg.R2.AccessKeyID, cfg.R2.SecretAccessKey, cfg.R2.BucketName, cfg.R2.PublicURL)
 	mediaSvc := service.NewMediaService(mediaRepo, cardRepo, deckRepo, r2Client, cfg.R2)
+	goalSvc := service.NewGoalService(goalRepo, reviewRepo)
 
 	// Handlers
 	healthH := handler.NewHealthHandler(pool)
@@ -97,6 +99,7 @@ func run() error {
 	statsH := handler.NewStatsHandler(statsSvc)
 	quizH := handler.NewQuizHandler(quizSvc)
 	mediaH := handler.NewMediaHandler(mediaSvc)
+	goalH := handler.NewGoalHandler(goalSvc)
 
 	// Router
 	r := chi.NewRouter()
@@ -186,7 +189,17 @@ func run() error {
 				r.Get("/heatmap", statsH.Heatmap)
 				r.Get("/forecast", statsH.Forecast)
 				r.Get("/leaderboard", statsH.Leaderboard)
+				r.Get("/mastery", statsH.Mastery)
+				r.Get("/weak-areas", statsH.WeakAreas)
+				r.Get("/test-comparison/{deckID}", statsH.TestComparison)
 				r.Get("/deck/{deckID}", statsH.DeckStats)
+			})
+
+			// Goals
+			r.Route("/goals", func(r chi.Router) {
+				r.Post("/", goalH.SetGoal)
+				r.Get("/", goalH.ListWithProgress)
+				r.Delete("/{goalID}", goalH.DeleteGoal)
 			})
 
 			// Quizzes

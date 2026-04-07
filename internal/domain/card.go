@@ -83,4 +83,7 @@ type CardRepository interface {
 	GetDueCards(ctx context.Context, deckID uuid.UUID, now time.Time, newLimit, reviewLimit int) ([]Card, error)
 	CountByState(ctx context.Context, deckID uuid.UUID) (map[CardState]int, error)
 	CountDue(ctx context.Context, deckID uuid.UUID, now time.Time) (int, error)
+
+	GetDeckMasteryStats(ctx context.Context, deckID uuid.UUID) (totalCards, matureCards int, avgStability float64, err error)
+	GetWeakCards(ctx context.Context, userID uuid.UUID, limit int) ([]Card, error)
 }

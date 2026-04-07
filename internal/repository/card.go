@@ -230,3 +230,43 @@ func (r *CardRepository) CountDue(ctx context.Context, deckID uuid.UUID, now tim
 	).Scan(&count)
 	return count, err
 }
+
+func (r *CardRepository) GetDeckMasteryStats(ctx context.Context, deckID uuid.UUID) (totalCards, matureCards int, avgStability float64, err error) {
+	err = r.db.QueryRow(ctx,
+		`SELECT
+			COUNT(*)::int AS total,
+			COUNT(*) FILTER (WHERE state = 2)::int AS mature,
+			COALESCE(AVG(stability), 0) AS avg_stability
+		FROM cards
+		WHERE deck_id = $1 AND NOT is_suspended`, deckID,
+	).Scan(&totalCards, &matureCards, &avgStability)
+	return
+}
+
+func (r *CardRepository) GetWeakCards(ctx context.Context, userID uuid.UUID, limit int) ([]domain.Card, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT c.id, c.deck_id, c.front, c.back, c.tags, c.due, c.stability, c.difficulty, c.elapsed_days, c.scheduled_days, c.reps, c.lapses, c.state, c.last_review, c.is_suspended, c.position, c.created_at, c.updated_at
+		FROM cards c
+		JOIN decks d ON d.id = c.deck_id
+		WHERE d.user_id = $1 AND NOT c.is_suspended
+			AND (c.lapses > 2 OR (c.stability < 5 AND c.reps > 0))
+		ORDER BY c.lapses DESC, c.stability ASC
+		LIMIT $2`, userID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cards []domain.Card
+	for rows.Next() {
+		var c domain.Card
+		if err := rows.Scan(&c.ID, &c.DeckID, &c.Front, &c.Back, &c.Tags, &c.Due, &c.Stability, &c.Difficulty,
+			&c.ElapsedDays, &c.ScheduledDays, &c.Reps, &c.Lapses, &c.State, &c.LastReview,
+			&c.IsSuspended, &c.Position, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		cards = append(cards, c)
+	}
+	return cards, nil
+}

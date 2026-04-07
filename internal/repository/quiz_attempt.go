@@ -153,3 +153,18 @@ func (r *QuizAttemptRepository) GetAnswerByAttemptAndQuestion(ctx context.Contex
 	}
 	return &a, err
 }
+
+func (r *QuizAttemptRepository) GetBestAttemptByQuizID(ctx context.Context, quizID uuid.UUID) (*domain.QuizAttempt, error) {
+	var a domain.QuizAttempt
+	err := r.db.QueryRow(ctx,
+		`SELECT id, quiz_id, user_id, started_at, completed_at, score, total_points, total_questions, correct_count, duration_ms, created_at
+		FROM quiz_attempts WHERE quiz_id = $1 AND completed_at IS NOT NULL
+		ORDER BY score DESC
+		LIMIT 1`, quizID,
+	).Scan(&a.ID, &a.QuizID, &a.UserID, &a.StartedAt, &a.CompletedAt, &a.Score,
+		&a.TotalPoints, &a.TotalQuestions, &a.CorrectCount, &a.DurationMS, &a.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrNotFound
+	}
+	return &a, err
+}
