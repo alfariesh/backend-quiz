@@ -124,6 +124,13 @@ func (s *StatsService) Forecast(ctx context.Context, userID uuid.UUID) ([]Foreca
 	return forecast, nil
 }
 
+func (s *StatsService) Leaderboard(ctx context.Context, limit int) ([]domain.LeaderboardEntry, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	return s.statsRepo.GetGlobalLeaderboard(ctx, limit)
+}
+
 func (s *StatsService) DeckStats(ctx context.Context, userID uuid.UUID, deckID uuid.UUID) (map[string]any, error) {
 	counts, err := s.cardRepo.CountByState(ctx, deckID)
 	if err != nil {

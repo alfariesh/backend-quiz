@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -49,6 +50,22 @@ func (h *StatsHandler) Forecast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusOK, forecast)
+}
+
+func (h *StatsHandler) Leaderboard(w http.ResponseWriter, r *http.Request) {
+	limit := 20
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+
+	entries, err := h.statsSvc.Leaderboard(r.Context(), limit)
+	if err != nil {
+		HandleError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, entries)
 }
 
 func (h *StatsHandler) DeckStats(w http.ResponseWriter, r *http.Request) {
