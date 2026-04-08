@@ -2,12 +2,11 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
 
-	"github.com/rekanesiads/backend-quiz/config"
 	"github.com/rekanesiads/backend-quiz/internal/domain"
 )
 
@@ -16,7 +15,6 @@ type StudyService struct {
 	reviewRepo  domain.ReviewRepository
 	sessionRepo domain.StudySessionRepository
 	userRepo    domain.UserRepository
-	fsrsConfig  config.FSRSConfig
 }
 
 func NewStudyService(
@@ -24,14 +22,12 @@ func NewStudyService(
 	reviewRepo domain.ReviewRepository,
 	sessionRepo domain.StudySessionRepository,
 	userRepo domain.UserRepository,
-	fsrsConfig config.FSRSConfig,
 ) *StudyService {
 	return &StudyService{
 		cardRepo:    cardRepo,
 		reviewRepo:  reviewRepo,
 		sessionRepo: sessionRepo,
 		userRepo:    userRepo,
-		fsrsConfig:  fsrsConfig,
 	}
 }
 
@@ -52,32 +48,39 @@ type DueCounts struct {
 	Total    int `json:"total"`
 }
 
+// FSRSCardState represents the pre-computed FSRS card state from the client (ts-fsrs).
+type FSRSCardState struct {
+	Due           time.Time `json:"due" validate:"required"`
+	Stability     float64   `json:"stability" validate:"min=0"`
+	Difficulty    float64   `json:"difficulty" validate:"min=0,max=10"`
+	ElapsedDays   int       `json:"elapsed_days" validate:"min=0"`
+	ScheduledDays int       `json:"scheduled_days" validate:"min=0"`
+	Reps          int       `json:"reps" validate:"min=0"`
+	Lapses        int       `json:"lapses" validate:"min=0"`
+	State         int       `json:"state" validate:"min=0,max=3"`
+	LastReview    time.Time `json:"last_review" validate:"required"`
+}
+
+// FSRSLogState represents the pre-computed FSRS review log state from the client.
+type FSRSLogState struct {
+	ScheduledDays int     `json:"scheduled_days"`
+	ElapsedDays   int     `json:"elapsed_days"`
+	Stability     float64 `json:"stability"`
+	Difficulty    float64 `json:"difficulty"`
+}
+
 type SubmitReviewRequest struct {
-	CardID     uuid.UUID `json:"card_id" validate:"required"`
-	Rating     int       `json:"rating" validate:"required,min=1,max=4"`
-	DurationMS int       `json:"duration_ms" validate:"min=0"`
+	CardID     uuid.UUID     `json:"card_id" validate:"required"`
+	Rating     int           `json:"rating" validate:"required,min=1,max=4"`
+	DurationMS int           `json:"duration_ms" validate:"min=0"`
+	Card       FSRSCardState `json:"card" validate:"required"`
+	Log        FSRSLogState  `json:"log"`
 }
 
 type ReviewResult struct {
-	Card          domain.Card `json:"card"`
-	ReviewLog     domain.ReviewLog `json:"review_log"`
-	Retrievability float64    `json:"retrievability"`
-	NextDue       time.Time   `json:"next_due"`
-}
-
-type PreviewResult struct {
-	Again PreviewInfo `json:"again"`
-	Hard  PreviewInfo `json:"hard"`
-	Good  PreviewInfo `json:"good"`
-	Easy  PreviewInfo `json:"easy"`
-}
-
-type PreviewInfo struct {
-	Due           time.Time `json:"due"`
-	Stability     float64   `json:"stability"`
-	Difficulty    float64   `json:"difficulty"`
-	ScheduledDays int       `json:"scheduled_days"`
-	State         string    `json:"state"`
+	Card      domain.Card      `json:"card"`
+	ReviewLog domain.ReviewLog `json:"review_log"`
+	NextDue   time.Time        `json:"next_due"`
 }
 
 func (s *StudyService) StartSession(ctx context.Context, userID uuid.UUID, req StartSessionRequest) (*StartSessionResponse, error) {
@@ -140,30 +143,20 @@ func (s *StudyService) SubmitReview(ctx context.Context, userID uuid.UUID, sessi
 		return nil, domain.ErrCardSuspended
 	}
 
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
+	if err := validateFSRSState(req.Card); err != nil {
 		return nil, err
 	}
-
-	// Build FSRS instance with user parameters
-	f := buildFSRS(user, s.fsrsConfig)
-	now := time.Now()
-
-	// Convert domain card to FSRS card
-	fsrsCard := toFSRSCard(card)
-	rating := fsrs.Rating(req.Rating)
-
-	// Get scheduling result
-	schedulingInfo := f.Next(fsrsCard, now, rating)
 
 	// Store state before review for the log
 	stateBefore := card.State
 
-	// Update card with new FSRS state
-	fromFSRSCard(&schedulingInfo.Card, card)
+	// Apply client-computed FSRS state
+	applyFSRSCardState(card, req.Card)
 	if err := s.cardRepo.UpdateFSRS(ctx, card); err != nil {
 		return nil, err
 	}
+
+	now := time.Now()
 
 	// Create review log
 	reviewLog := &domain.ReviewLog{
@@ -171,11 +164,12 @@ func (s *StudyService) SubmitReview(ctx context.Context, userID uuid.UUID, sessi
 		UserID:        userID,
 		Rating:        domain.Rating(req.Rating),
 		State:         stateBefore,
-		ScheduledDays: int(schedulingInfo.ReviewLog.ScheduledDays),
-		ElapsedDays:   int(schedulingInfo.ReviewLog.ElapsedDays),
-		Stability:     card.Stability,
-		Difficulty:    card.Difficulty,
+		ScheduledDays: req.Log.ScheduledDays,
+		ElapsedDays:   req.Log.ElapsedDays,
+		Stability:     req.Log.Stability,
+		Difficulty:    req.Log.Difficulty,
 		DurationMS:    req.DurationMS,
+		Source:        domain.ReviewSourceFlashcard,
 		ReviewedAt:    now,
 	}
 	if err := s.reviewRepo.Create(ctx, reviewLog); err != nil {
@@ -202,13 +196,10 @@ func (s *StudyService) SubmitReview(ctx context.Context, userID uuid.UUID, sessi
 		return nil, err
 	}
 
-	retrievability := f.GetRetrievability(schedulingInfo.Card, now)
-
 	return &ReviewResult{
-		Card:           *card,
-		ReviewLog:      *reviewLog,
-		Retrievability: retrievability,
-		NextDue:        card.Due,
+		Card:      *card,
+		ReviewLog: *reviewLog,
+		NextDue:   card.Due,
 	}, nil
 }
 
@@ -232,39 +223,6 @@ func (s *StudyService) EndSession(ctx context.Context, userID uuid.UUID, session
 	return session, nil
 }
 
-func (s *StudyService) Preview(ctx context.Context, userID uuid.UUID, deckID uuid.UUID) (*PreviewResult, *DueCounts, error) {
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	now := time.Now()
-	cards, err := s.cardRepo.GetDueCards(ctx, deckID, now, user.DailyNewLimit, user.DailyReviewLimit)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	counts := s.countCards(cards)
-
-	if len(cards) == 0 {
-		return nil, &counts, nil
-	}
-
-	// Preview the first due card
-	f := buildFSRS(user, s.fsrsConfig)
-	fsrsCard := toFSRSCard(&cards[0])
-	recordLog := f.Repeat(fsrsCard, now)
-
-	preview := &PreviewResult{
-		Again: toPreviewInfo(recordLog[fsrs.Again]),
-		Hard:  toPreviewInfo(recordLog[fsrs.Hard]),
-		Good:  toPreviewInfo(recordLog[fsrs.Good]),
-		Easy:  toPreviewInfo(recordLog[fsrs.Easy]),
-	}
-
-	return preview, &counts, nil
-}
-
 func (s *StudyService) countCards(cards []domain.Card) DueCounts {
 	counts := DueCounts{}
 	for _, c := range cards {
@@ -281,3 +239,33 @@ func (s *StudyService) countCards(cards []domain.Card) DueCounts {
 	return counts
 }
 
+// applyFSRSCardState writes the client-computed FSRS state onto a domain card.
+func applyFSRSCardState(card *domain.Card, state FSRSCardState) {
+	card.Due = state.Due
+	card.Stability = state.Stability
+	card.Difficulty = state.Difficulty
+	card.ElapsedDays = state.ElapsedDays
+	card.ScheduledDays = state.ScheduledDays
+	card.Reps = state.Reps
+	card.Lapses = state.Lapses
+	card.State = domain.CardState(state.State)
+	card.LastReview = &state.LastReview
+}
+
+// validateFSRSState performs basic sanity checks on client-provided FSRS state.
+func validateFSRSState(card FSRSCardState) error {
+	if card.State < 0 || card.State > 3 {
+		return fmt.Errorf("%w: invalid card state", domain.ErrInvalidInput)
+	}
+	if card.Stability < 0 {
+		return fmt.Errorf("%w: stability must be >= 0", domain.ErrInvalidInput)
+	}
+	if card.Difficulty < 0 || card.Difficulty > 10 {
+		return fmt.Errorf("%w: difficulty must be 0-10", domain.ErrInvalidInput)
+	}
+	maxDue := time.Now().AddDate(0, 0, 36500)
+	if card.Due.After(maxDue) {
+		return fmt.Errorf("%w: due date too far in future", domain.ErrInvalidInput)
+	}
+	return nil
+}

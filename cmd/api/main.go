@@ -82,9 +82,9 @@ func run() error {
 	authSvc := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.RefreshDuration)
 	deckSvc := service.NewDeckService(deckRepo, cardRepo)
 	cardSvc := service.NewCardService(cardRepo, deckRepo)
-	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, cfg.FSRS)
+	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
 	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, quizAttemptRepo)
-	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo, userRepo, reviewRepo, cfg.FSRS)
+	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo, reviewRepo)
 
 	r2Client := storage.NewR2Client(cfg.R2.AccountID, cfg.R2.AccessKeyID, cfg.R2.SecretAccessKey, cfg.R2.BucketName, cfg.R2.PublicURL)
 	mediaSvc := service.NewMediaService(mediaRepo, cardRepo, deckRepo, r2Client, cfg.R2)
@@ -180,7 +180,6 @@ func run() error {
 				r.Get("/sessions/{sessionID}", studyH.GetSession)
 				r.Post("/sessions/{sessionID}/review", studyH.SubmitReview)
 				r.Put("/sessions/{sessionID}/end", studyH.EndSession)
-				r.Get("/preview/{deckID}", studyH.Preview)
 			})
 
 			// Stats

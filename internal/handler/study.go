@@ -98,21 +98,3 @@ func (h *StudyHandler) EndSession(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, session)
 }
 
-func (h *StudyHandler) Preview(w http.ResponseWriter, r *http.Request) {
-	userID, _ := middleware.GetUserID(r.Context())
-	deckID, err := uuid.Parse(chi.URLParam(r, "deckID"))
-	if err != nil {
-		JSONError(w, http.StatusBadRequest, "invalid deck id")
-		return
-	}
-
-	preview, counts, err := h.studySvc.Preview(r.Context(), userID, deckID)
-	if err != nil {
-		HandleError(w, err)
-		return
-	}
-	JSON(w, http.StatusOK, map[string]any{
-		"preview": preview,
-		"counts":  counts,
-	})
-}

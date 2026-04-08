@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
 
-	"github.com/rekanesiads/backend-quiz/config"
 	"github.com/rekanesiads/backend-quiz/internal/domain"
 )
 
@@ -21,9 +19,7 @@ type QuizService struct {
 	attemptRepo domain.QuizAttemptRepository
 	cardRepo    domain.CardRepository
 	deckRepo    domain.DeckRepository
-	userRepo    domain.UserRepository
 	reviewRepo  domain.ReviewRepository
-	fsrsConfig  config.FSRSConfig
 }
 
 func NewQuizService(
@@ -31,18 +27,14 @@ func NewQuizService(
 	attemptRepo domain.QuizAttemptRepository,
 	cardRepo domain.CardRepository,
 	deckRepo domain.DeckRepository,
-	userRepo domain.UserRepository,
 	reviewRepo domain.ReviewRepository,
-	fsrsConfig config.FSRSConfig,
 ) *QuizService {
 	return &QuizService{
 		quizRepo:    quizRepo,
 		attemptRepo: attemptRepo,
 		cardRepo:    cardRepo,
 		deckRepo:    deckRepo,
-		userRepo:    userRepo,
 		reviewRepo:  reviewRepo,
-		fsrsConfig:  fsrsConfig,
 	}
 }
 
@@ -102,19 +94,21 @@ type GenerateAyatQuizRequest struct {
 }
 
 type SubmitAnswerRequest struct {
-	QuestionID uuid.UUID `json:"question_id" validate:"required"`
-	Answer     string    `json:"answer" validate:"required"`
-	DurationMS int       `json:"duration_ms" validate:"min=0"`
+	QuestionID uuid.UUID      `json:"question_id" validate:"required"`
+	Answer     string         `json:"answer" validate:"required"`
+	DurationMS int            `json:"duration_ms" validate:"min=0"`
+	FSRSCard   *FSRSCardState `json:"fsrs_card,omitempty"`
+	FSRSLog    *FSRSLogState  `json:"fsrs_log,omitempty"`
+	Rating     *int           `json:"rating,omitempty" validate:"omitempty,min=1,max=4"`
 }
 
 type AnswerResult struct {
-	Answer         domain.QuizAnswer `json:"answer"`
-	IsCorrect      bool              `json:"is_correct"`
-	Explanation    string            `json:"explanation"`
-	CorrectAnswer  string            `json:"correct_answer"`
-	CardUpdated    bool              `json:"card_updated"`
-	NextDue        *time.Time        `json:"next_due,omitempty"`
-	Retrievability *float64          `json:"retrievability,omitempty"`
+	Answer        domain.QuizAnswer `json:"answer"`
+	IsCorrect     bool              `json:"is_correct"`
+	Explanation   string            `json:"explanation"`
+	CorrectAnswer string            `json:"correct_answer"`
+	CardUpdated   bool              `json:"card_updated"`
+	NextDue       *time.Time        `json:"next_due,omitempty"`
 }
 
 type QuizDetail struct {
@@ -1013,9 +1007,9 @@ func (s *QuizService) SubmitAnswer(ctx context.Context, userID, attemptID uuid.U
 		CorrectAnswer: question.CorrectAnswer,
 	}
 
-	// FSRS integration: update linked card's spaced repetition state
-	if question.CardID != nil {
-		s.applyFSRSFromQuiz(ctx, userID, *question.CardID, isCorrect, req.DurationMS, result)
+	// FSRS integration: update linked card if client provided pre-computed state
+	if question.CardID != nil && req.FSRSCard != nil {
+		s.applyFSRSFromQuiz(ctx, userID, *question.CardID, req, result)
 	}
 
 	return result, nil
@@ -1088,49 +1082,49 @@ func (s *QuizService) ListAttempts(ctx context.Context, userID, quizID uuid.UUID
 
 // FSRS integration
 
-func (s *QuizService) applyFSRSFromQuiz(ctx context.Context, userID uuid.UUID, cardID uuid.UUID, isCorrect bool, durationMS int, result *AnswerResult) {
+func (s *QuizService) applyFSRSFromQuiz(ctx context.Context, userID uuid.UUID, cardID uuid.UUID, req SubmitAnswerRequest, result *AnswerResult) {
 	card, err := s.cardRepo.GetByID(ctx, cardID)
 	if err != nil || card.IsSuspended {
 		return
 	}
 
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
+	if err := validateFSRSState(*req.FSRSCard); err != nil {
 		return
 	}
 
-	// Map quiz result to FSRS rating
-	var rating fsrs.Rating
-	if isCorrect {
-		rating = fsrs.Good // 3
-	} else {
-		rating = fsrs.Again // 1
-	}
-
-	f := buildFSRS(user, s.fsrsConfig)
-	now := time.Now()
-
-	fsrsCard := toFSRSCard(card)
-	schedulingInfo := f.Next(fsrsCard, now, rating)
-
 	stateBefore := card.State
 
-	fromFSRSCard(&schedulingInfo.Card, card)
+	// Apply client-computed FSRS state
+	applyFSRSCardState(card, *req.FSRSCard)
 	if err := s.cardRepo.UpdateFSRS(ctx, card); err != nil {
 		return
 	}
 
-	// Create review log with quiz source
+	// Determine rating: use client-provided or default based on correctness
+	rating := domain.RatingGood
+	if req.Rating != nil {
+		rating = domain.Rating(*req.Rating)
+	} else if !result.IsCorrect {
+		rating = domain.RatingAgain
+	}
+
+	now := time.Now()
+
+	var logState FSRSLogState
+	if req.FSRSLog != nil {
+		logState = *req.FSRSLog
+	}
+
 	reviewLog := &domain.ReviewLog{
 		CardID:        card.ID,
 		UserID:        userID,
-		Rating:        domain.Rating(rating),
+		Rating:        rating,
 		State:         stateBefore,
-		ScheduledDays: int(schedulingInfo.ReviewLog.ScheduledDays),
-		ElapsedDays:   int(schedulingInfo.ReviewLog.ElapsedDays),
-		Stability:     card.Stability,
-		Difficulty:    card.Difficulty,
-		DurationMS:    durationMS,
+		ScheduledDays: logState.ScheduledDays,
+		ElapsedDays:   logState.ElapsedDays,
+		Stability:     logState.Stability,
+		Difficulty:    logState.Difficulty,
+		DurationMS:    req.DurationMS,
 		Source:        domain.ReviewSourceQuiz,
 		ReviewedAt:    now,
 	}
@@ -1138,11 +1132,8 @@ func (s *QuizService) applyFSRSFromQuiz(ctx context.Context, userID uuid.UUID, c
 		return
 	}
 
-	retrievability := f.GetRetrievability(schedulingInfo.Card, now)
-
 	result.CardUpdated = true
 	result.NextDue = &card.Due
-	result.Retrievability = &retrievability
 }
 
 // Grading logic

@@ -12,8 +12,7 @@ type Config struct {
 	Redis       RedisConfig
 	JWT         JWTConfig
 	GoogleOAuth GoogleOAuthConfig
-	R2          R2Config
-	FSRS        FSRSConfig
+	R2 R2Config
 }
 
 type ServerConfig struct {
@@ -55,12 +54,6 @@ type R2Config struct {
 	BucketName     string `envconfig:"R2_BUCKET_NAME"`
 	PublicURL      string `envconfig:"R2_PUBLIC_URL"`
 	MaxFileSizeMB  int    `envconfig:"R2_MAX_FILE_SIZE_MB" default:"10"`
-}
-
-type FSRSConfig struct {
-	DefaultRetention float64 `envconfig:"FSRS_DEFAULT_RETENTION" default:"0.9"`
-	MaxInterval      float64 `envconfig:"FSRS_MAX_INTERVAL" default:"36500"`
-	EnableFuzz       bool    `envconfig:"FSRS_ENABLE_FUZZ" default:"true"`
 }
 
 func Load() (*Config, error) {
