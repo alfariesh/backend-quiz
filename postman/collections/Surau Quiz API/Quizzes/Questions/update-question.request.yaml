@@ -1,0 +1,25 @@
+$kind: http-request
+name: Update Question
+method: PUT
+url: '{{base_url}}/api/v1/quizzes/{{quiz_id}}/questions/{{question_id}}'
+order: 5000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: quiz_id
+    value: '{{quiz_id}}'
+  - key: question_id
+    value: '{{question_id}}'
+body:
+  type: json
+  content: |-
+    {
+      "question_type": "mcq",
+      "question_text": "Updated Q?",
+      "correct_answer": "B",
+      "explanation": "Updated explanation",
+      "points": 2
+    }

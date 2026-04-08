@@ -1,0 +1,11 @@
+$kind: http-request
+name: Preview Study Session
+method: GET
+url: '{{base_url}}/api/v1/study/preview/{{deck_id}}'
+order: 5000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: deck_id
+    value: '{{deck_id}}'

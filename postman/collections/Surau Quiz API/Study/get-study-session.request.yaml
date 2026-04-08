@@ -1,0 +1,11 @@
+$kind: http-request
+name: Get Study Session
+method: GET
+url: '{{base_url}}/api/v1/study/sessions/{{session_id}}'
+order: 2000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: session_id
+    value: '{{session_id}}'

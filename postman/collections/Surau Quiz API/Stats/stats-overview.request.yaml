@@ -1,0 +1,8 @@
+$kind: http-request
+name: Stats Overview
+method: GET
+url: '{{base_url}}/api/v1/stats/overview'
+order: 1000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'

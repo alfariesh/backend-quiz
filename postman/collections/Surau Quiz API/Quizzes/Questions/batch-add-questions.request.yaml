@@ -1,0 +1,28 @@
+$kind: http-request
+name: Batch Add Questions
+method: POST
+url: '{{base_url}}/api/v1/quizzes/{{quiz_id}}/questions/batch'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: quiz_id
+    value: '{{quiz_id}}'
+body:
+  type: json
+  content: |-
+    {
+      "questions": [
+        {
+          "question_type": "mcq",
+          "question_text": "Q1?",
+          "options": [],
+          "correct_answer": "A",
+          "explanation": "",
+          "points": 1
+        }
+      ]
+    }

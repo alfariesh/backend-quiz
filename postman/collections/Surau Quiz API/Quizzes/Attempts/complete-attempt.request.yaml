@@ -1,0 +1,13 @@
+$kind: http-request
+name: Complete Attempt
+method: PUT
+url: '{{base_url}}/api/v1/quizzes/{{quiz_id}}/attempts/{{attempt_id}}/complete'
+order: 5000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: quiz_id
+    value: '{{quiz_id}}'
+  - key: attempt_id
+    value: '{{attempt_id}}'

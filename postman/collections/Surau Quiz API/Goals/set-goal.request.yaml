@@ -1,0 +1,17 @@
+$kind: http-request
+name: Set Goal
+method: POST
+url: '{{base_url}}/api/v1/goals'
+order: 1000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+body:
+  type: json
+  content: |-
+    {
+      "goal_type": "daily_reviews",
+      "target_value": 50
+    }

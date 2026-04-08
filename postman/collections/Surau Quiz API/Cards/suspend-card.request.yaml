@@ -1,0 +1,19 @@
+$kind: http-request
+name: Suspend Card
+method: PUT
+url: '{{base_url}}/api/v1/cards/{{card_id}}/suspend'
+order: 7000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: card_id
+    value: '{{card_id}}'
+body:
+  type: json
+  content: |-
+    {
+      "suspended": true
+    }

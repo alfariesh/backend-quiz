@@ -1,0 +1,11 @@
+$kind: http-request
+name: Deck Stats
+method: GET
+url: '{{base_url}}/api/v1/stats/deck/{{deck_id}}'
+order: 8000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: deck_id
+    value: '{{deck_id}}'

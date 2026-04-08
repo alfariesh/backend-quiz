@@ -2,78 +2,78 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/repository/sqlc"
 )
 
 type StudySessionRepository struct {
-	db *pgxpool.Pool
+	q *sqlc.Queries
 }
 
-func NewStudySessionRepository(db *pgxpool.Pool) *StudySessionRepository {
-	return &StudySessionRepository{db: db}
+func NewStudySessionRepository(pool *pgxpool.Pool) *StudySessionRepository {
+	return &StudySessionRepository{q: sqlc.New(pool)}
 }
 
 func (r *StudySessionRepository) Create(ctx context.Context, session *domain.StudySession) error {
-	return r.db.QueryRow(ctx,
-		`INSERT INTO study_sessions (user_id, deck_id) VALUES ($1, $2)
-		RETURNING id, started_at, new_count, review_count, relearn_count, total_duration_ms`,
-		session.UserID, session.DeckID,
-	).Scan(&session.ID, &session.StartedAt, &session.NewCount, &session.ReviewCount,
-		&session.RelearnCount, &session.TotalDurationMS)
+	result, err := r.q.CreateStudySession(ctx, sqlc.CreateStudySessionParams{
+		UserID: session.UserID,
+		DeckID: uuidToNullable(session.DeckID),
+	})
+	if err != nil {
+		return err
+	}
+	*session = sessionFromSqlc(result)
+	return nil
 }
 
 func (r *StudySessionRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.StudySession, error) {
-	var s domain.StudySession
-	err := r.db.QueryRow(ctx,
-		`SELECT id, user_id, deck_id, started_at, ended_at, new_count, review_count, relearn_count, total_duration_ms
-		FROM study_sessions WHERE id = $1`, id,
-	).Scan(&s.ID, &s.UserID, &s.DeckID, &s.StartedAt, &s.EndedAt,
-		&s.NewCount, &s.ReviewCount, &s.RelearnCount, &s.TotalDurationMS)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, domain.ErrNotFound
+	result, err := r.q.GetStudySessionByID(ctx, id)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
 	}
-	return &s, err
+	s := sessionFromSqlc(result)
+	return &s, nil
 }
 
 func (r *StudySessionRepository) Update(ctx context.Context, session *domain.StudySession) error {
-	_, err := r.db.Exec(ctx,
-		`UPDATE study_sessions SET ended_at=$2, new_count=$3, review_count=$4, relearn_count=$5, total_duration_ms=$6
-		WHERE id = $1`,
-		session.ID, session.EndedAt, session.NewCount, session.ReviewCount,
-		session.RelearnCount, session.TotalDurationMS,
-	)
+	_, err := r.q.UpdateStudySession(ctx, sqlc.UpdateStudySessionParams{
+		ID:              session.ID,
+		EndedAt:         timeToNullable(session.EndedAt),
+		NewCount:        pgtype.Int4{Int32: int32(session.NewCount), Valid: true},
+		ReviewCount:     pgtype.Int4{Int32: int32(session.ReviewCount), Valid: true},
+		RelearnCount:    pgtype.Int4{Int32: int32(session.RelearnCount), Valid: true},
+		TotalDurationMs: pgtype.Int4{Int32: int32(session.TotalDurationMS), Valid: true},
+	})
 	return err
 }
 
 func (r *StudySessionRepository) ListByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.StudySession, int, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT id, user_id, deck_id, started_at, ended_at, new_count, review_count, relearn_count, total_duration_ms
-		FROM study_sessions WHERE user_id = $1
-		ORDER BY started_at DESC
-		LIMIT $2 OFFSET $3`, userID, limit, offset,
-	)
+	rows, err := r.q.ListStudySessionsByUserID(ctx, sqlc.ListStudySessionsByUserIDParams{
+		UserID: userID,
+		Limit:  int32(limit),
+		Offset: int32(offset),
+	})
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
 
-	var sessions []domain.StudySession
-	for rows.Next() {
-		var s domain.StudySession
-		if err := rows.Scan(&s.ID, &s.UserID, &s.DeckID, &s.StartedAt, &s.EndedAt,
-			&s.NewCount, &s.ReviewCount, &s.RelearnCount, &s.TotalDurationMS); err != nil {
-			return nil, 0, err
-		}
-		sessions = append(sessions, s)
+	total, err := r.q.CountStudySessionsByUserID(ctx, userID)
+	if err != nil {
+		return nil, 0, err
 	}
 
-	var total int
-	err = r.db.QueryRow(ctx, `SELECT COUNT(*)::int FROM study_sessions WHERE user_id = $1`, userID).Scan(&total)
-	return sessions, total, err
+	sessions := make([]domain.StudySession, len(rows))
+	for i, row := range rows {
+		sessions[i] = sessionFromSqlc(row)
+	}
+	return sessions, int(total), nil
 }

@@ -1,0 +1,26 @@
+$kind: http-request
+name: Batch Create Cards
+method: POST
+url: '{{base_url}}/api/v1/decks/{{deck_id}}/cards/batch'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: deck_id
+    value: '{{deck_id}}'
+body:
+  type: json
+  content: |-
+    {
+      "cards": [
+        {
+          "front": "Q1",
+          "back": "A1",
+          "content_type": "plain",
+          "tags": []
+        }
+      ]
+    }

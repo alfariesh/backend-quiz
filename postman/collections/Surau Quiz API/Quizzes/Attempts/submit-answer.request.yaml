@@ -1,0 +1,23 @@
+$kind: http-request
+name: Submit Answer
+method: POST
+url: '{{base_url}}/api/v1/quizzes/{{quiz_id}}/attempts/{{attempt_id}}/answer'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: quiz_id
+    value: '{{quiz_id}}'
+  - key: attempt_id
+    value: '{{attempt_id}}'
+body:
+  type: json
+  content: |-
+    {
+      "question_id": "{{question_id}}",
+      "answer": "A",
+      "duration_ms": 3000
+    }

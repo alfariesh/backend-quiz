@@ -1,0 +1,24 @@
+$kind: http-request
+name: Update Quiz
+method: PUT
+url: '{{base_url}}/api/v1/quizzes/{{quiz_id}}'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: quiz_id
+    value: '{{quiz_id}}'
+body:
+  type: json
+  content: |-
+    {
+      "title": "Updated Quiz",
+      "description": "Updated desc",
+      "quiz_type": "mcq",
+      "time_limit_seconds": 600,
+      "shuffle_questions": true,
+      "is_published": false
+    }

@@ -2,277 +2,228 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/repository/sqlc"
 )
 
 type CardRepository struct {
-	db *pgxpool.Pool
+	q    *sqlc.Queries
+	pool *pgxpool.Pool
 }
 
-func NewCardRepository(db *pgxpool.Pool) *CardRepository {
-	return &CardRepository{db: db}
+func NewCardRepository(pool *pgxpool.Pool) *CardRepository {
+	return &CardRepository{q: sqlc.New(pool), pool: pool}
 }
 
 func (r *CardRepository) Create(ctx context.Context, card *domain.Card) error {
 	if card.ContentType == "" {
 		card.ContentType = domain.ContentTypePlain
 	}
-	return r.db.QueryRow(ctx,
-		`INSERT INTO cards (deck_id, front, back, content_type, tags, position)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, is_suspended, created_at, updated_at`,
-		card.DeckID, card.Front, card.Back, card.ContentType, card.Tags, card.Position,
-	).Scan(&card.ID, &card.Due, &card.Stability, &card.Difficulty, &card.ElapsedDays,
-		&card.ScheduledDays, &card.Reps, &card.Lapses, &card.State, &card.LastReview,
-		&card.IsSuspended, &card.CreatedAt, &card.UpdatedAt)
+	result, err := r.q.CreateCard(ctx, sqlc.CreateCardParams{
+		DeckID:      card.DeckID,
+		Front:       card.Front,
+		Back:        card.Back,
+		ContentType: card.ContentType,
+		Tags:        card.Tags,
+		Position:    int32(card.Position),
+	})
+	if err != nil {
+		return err
+	}
+	*card = cardFromSqlc(result)
+	return nil
 }
 
 func (r *CardRepository) BulkCreate(ctx context.Context, cards []*domain.Card) error {
-	tx, err := r.db.Begin(ctx)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 
+	qtx := r.q.WithTx(tx)
 	for _, card := range cards {
 		if card.ContentType == "" {
 			card.ContentType = domain.ContentTypePlain
 		}
-		err := tx.QueryRow(ctx,
-			`INSERT INTO cards (deck_id, front, back, content_type, tags, position)
-			VALUES ($1, $2, $3, $4, $5, $6)
-			RETURNING id, due, created_at, updated_at`,
-			card.DeckID, card.Front, card.Back, card.ContentType, card.Tags, card.Position,
-		).Scan(&card.ID, &card.Due, &card.CreatedAt, &card.UpdatedAt)
+		result, err := qtx.CreateCard(ctx, sqlc.CreateCardParams{
+			DeckID:      card.DeckID,
+			Front:       card.Front,
+			Back:        card.Back,
+			ContentType: card.ContentType,
+			Tags:        card.Tags,
+			Position:    int32(card.Position),
+		})
 		if err != nil {
 			return err
 		}
+		*card = cardFromSqlc(result)
 	}
 
 	return tx.Commit(ctx)
 }
 
 func (r *CardRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Card, error) {
-	var c domain.Card
-	err := r.db.QueryRow(ctx,
-		`SELECT id, deck_id, front, back, content_type, tags, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, is_suspended, position, created_at, updated_at
-		FROM cards WHERE id = $1`, id,
-	).Scan(&c.ID, &c.DeckID, &c.Front, &c.Back, &c.ContentType, &c.Tags, &c.Due, &c.Stability, &c.Difficulty,
-		&c.ElapsedDays, &c.ScheduledDays, &c.Reps, &c.Lapses, &c.State, &c.LastReview,
-		&c.IsSuspended, &c.Position, &c.CreatedAt, &c.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, domain.ErrNotFound
+	result, err := r.q.GetCardByID(ctx, id)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
 	}
-	return &c, err
+	c := cardFromSqlc(result)
+	return &c, nil
 }
 
 func (r *CardRepository) ListByDeckID(ctx context.Context, deckID uuid.UUID, filter domain.CardFilter, limit, offset int) ([]domain.Card, int, error) {
-	stateParam := (*int16)(nil)
+	var stateParam pgtype.Int2
 	if filter.State != nil {
-		v := int16(*filter.State)
-		stateParam = &v
+		stateParam = pgtype.Int2{Int16: int16(*filter.State), Valid: true}
 	}
-	tag := ""
+	var tagParam pgtype.Text
 	if filter.Tag != "" {
-		tag = filter.Tag
+		tagParam = pgtype.Text{String: filter.Tag, Valid: true}
 	}
-	query := ""
+	var queryParam pgtype.Text
 	if filter.Query != "" {
-		query = filter.Query
+		queryParam = pgtype.Text{String: filter.Query, Valid: true}
 	}
 
-	rows, err := r.db.Query(ctx,
-		`SELECT id, deck_id, front, back, content_type, tags, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, is_suspended, position, created_at, updated_at
-		FROM cards
-		WHERE deck_id = $1
-			AND ($2::smallint IS NULL OR state = $2)
-			AND ($3::text = '' OR $3 = ANY(tags))
-			AND ($4::text = '' OR front ILIKE '%' || $4 || '%' OR back ILIKE '%' || $4 || '%')
-		ORDER BY position, created_at
-		LIMIT $5 OFFSET $6`,
-		deckID, stateParam, tag, query, limit, offset)
+	rows, err := r.q.ListCardsByDeckID(ctx, sqlc.ListCardsByDeckIDParams{
+		DeckID:    deckID,
+		State:     stateParam,
+		Tag:       tagParam,
+		Query:     queryParam,
+		RowLimit:  int32(limit),
+		RowOffset: int32(offset),
+	})
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
 
-	var cards []domain.Card
-	for rows.Next() {
-		var c domain.Card
-		if err := rows.Scan(&c.ID, &c.DeckID, &c.Front, &c.Back, &c.Tags, &c.Due, &c.Stability, &c.Difficulty,
-			&c.ElapsedDays, &c.ScheduledDays, &c.Reps, &c.Lapses, &c.State, &c.LastReview,
-			&c.IsSuspended, &c.Position, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, 0, err
-		}
-		cards = append(cards, c)
+	total, err := r.q.CountCardsByDeckID(ctx, sqlc.CountCardsByDeckIDParams{
+		DeckID: deckID,
+		State:  stateParam,
+		Tag:    tagParam,
+		Query:  queryParam,
+	})
+	if err != nil {
+		return nil, 0, err
 	}
 
-	var total int
-	err = r.db.QueryRow(ctx,
-		`SELECT COUNT(*)::int FROM cards
-		WHERE deck_id = $1
-			AND ($2::smallint IS NULL OR state = $2)
-			AND ($3::text = '' OR $3 = ANY(tags))
-			AND ($4::text = '' OR front ILIKE '%' || $4 || '%' OR back ILIKE '%' || $4 || '%')`,
-		deckID, stateParam, tag, query).Scan(&total)
-	return cards, total, err
+	return cardsFromSqlc(rows), int(total), nil
 }
 
 func (r *CardRepository) Update(ctx context.Context, card *domain.Card) error {
-	_, err := r.db.Exec(ctx,
-		`UPDATE cards SET front=$2, back=$3, content_type=$4, tags=$5, updated_at=now() WHERE id = $1`,
-		card.ID, card.Front, card.Back, card.ContentType, card.Tags,
-	)
-	return err
+	return r.q.UpdateCard(ctx, sqlc.UpdateCardParams{
+		ID:          card.ID,
+		Front:       card.Front,
+		Back:        card.Back,
+		ContentType: card.ContentType,
+		Tags:        card.Tags,
+	})
 }
 
 func (r *CardRepository) UpdateFSRS(ctx context.Context, card *domain.Card) error {
-	_, err := r.db.Exec(ctx,
-		`UPDATE cards SET due=$2, stability=$3, difficulty=$4, elapsed_days=$5, scheduled_days=$6, reps=$7, lapses=$8, state=$9, last_review=$10, updated_at=now()
-		WHERE id = $1`,
-		card.ID, card.Due, card.Stability, card.Difficulty, card.ElapsedDays,
-		card.ScheduledDays, card.Reps, card.Lapses, int16(card.State), card.LastReview,
-	)
-	return err
+	return r.q.UpdateCardFSRS(ctx, sqlc.UpdateCardFSRSParams{
+		ID:            card.ID,
+		Due:           card.Due,
+		Stability:     float32(card.Stability),
+		Difficulty:    float32(card.Difficulty),
+		ElapsedDays:   int32(card.ElapsedDays),
+		ScheduledDays: int32(card.ScheduledDays),
+		Reps:          int32(card.Reps),
+		Lapses:        int32(card.Lapses),
+		State:         int16(card.State),
+		LastReview:    timeToNullable(card.LastReview),
+	})
 }
 
 func (r *CardRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM cards WHERE id = $1`, id)
-	return err
+	return r.q.DeleteCard(ctx, id)
 }
 
 func (r *CardRepository) SetSuspended(ctx context.Context, id uuid.UUID, suspended bool) error {
-	_, err := r.db.Exec(ctx, `UPDATE cards SET is_suspended = $2, updated_at = now() WHERE id = $1`, id, suspended)
-	return err
+	return r.q.SetCardSuspended(ctx, sqlc.SetCardSuspendedParams{
+		ID:          id,
+		IsSuspended: suspended,
+	})
 }
 
 func (r *CardRepository) ResetFSRS(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx,
-		`UPDATE cards SET due=now(), stability=0, difficulty=0, elapsed_days=0, scheduled_days=0, reps=0, lapses=0, state=0, last_review=NULL, updated_at=now()
-		WHERE id = $1`, id,
-	)
-	return err
+	return r.q.ResetCardFSRS(ctx, id)
 }
 
 func (r *CardRepository) GetDueCards(ctx context.Context, deckID uuid.UUID, now time.Time, newLimit, reviewLimit int) ([]domain.Card, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT id, deck_id, front, back, content_type, tags, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, is_suspended, position, created_at, updated_at
-		FROM cards
-		WHERE deck_id = $1 AND NOT is_suspended
-			AND (
-				(state = 0)
-				OR (state IN (1, 3) AND due <= $2)
-				OR (state = 2 AND due <= $2)
-			)
-		ORDER BY
-			CASE WHEN state IN (1, 3) THEN 0
-				WHEN state = 2 THEN 1
-				WHEN state = 0 THEN 2
-			END,
-			due ASC
-		LIMIT $3`,
-		deckID, now, newLimit+reviewLimit,
-	)
+	rows, err := r.q.GetDueCards(ctx, sqlc.GetDueCardsParams{
+		DeckID:  deckID,
+		Due:     now,
+		Limit:   int32(newLimit + reviewLimit),
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var cards []domain.Card
+	cards := cardsFromSqlc(rows)
+
+	// Apply new card limit
+	var result []domain.Card
 	newCount := 0
-	for rows.Next() {
-		var c domain.Card
-		if err := rows.Scan(&c.ID, &c.DeckID, &c.Front, &c.Back, &c.Tags, &c.Due, &c.Stability, &c.Difficulty,
-			&c.ElapsedDays, &c.ScheduledDays, &c.Reps, &c.Lapses, &c.State, &c.LastReview,
-			&c.IsSuspended, &c.Position, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, err
-		}
+	for _, c := range cards {
 		if c.State == domain.CardStateNew {
 			if newCount >= newLimit {
 				continue
 			}
 			newCount++
 		}
-		cards = append(cards, c)
+		result = append(result, c)
 	}
-
-	return cards, nil
+	return result, nil
 }
 
 func (r *CardRepository) CountByState(ctx context.Context, deckID uuid.UUID) (map[domain.CardState]int, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT state, COUNT(*)::int FROM cards WHERE deck_id = $1 AND NOT is_suspended GROUP BY state`, deckID,
-	)
+	rows, err := r.q.CountCardsByState(ctx, deckID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	counts := make(map[domain.CardState]int)
-	for rows.Next() {
-		var state int16
-		var count int
-		if err := rows.Scan(&state, &count); err != nil {
-			return nil, err
-		}
-		counts[domain.CardState(state)] = count
+	for _, row := range rows {
+		counts[domain.CardState(row.State)] = int(row.Count)
 	}
 	return counts, nil
 }
 
 func (r *CardRepository) CountDue(ctx context.Context, deckID uuid.UUID, now time.Time) (int, error) {
-	var count int
-	err := r.db.QueryRow(ctx,
-		`SELECT COUNT(*)::int FROM cards
-		WHERE deck_id = $1 AND NOT is_suspended AND state IN (1, 2, 3) AND due <= $2`,
-		deckID, now,
-	).Scan(&count)
-	return count, err
+	count, err := r.q.CountDueCards(ctx, sqlc.CountDueCardsParams{
+		DeckID: deckID,
+		Due:    now,
+	})
+	return int(count), err
 }
 
 func (r *CardRepository) GetDeckMasteryStats(ctx context.Context, deckID uuid.UUID) (totalCards, matureCards int, avgStability float64, err error) {
-	err = r.db.QueryRow(ctx,
-		`SELECT
-			COUNT(*)::int AS total,
-			COUNT(*) FILTER (WHERE state = 2)::int AS mature,
-			COALESCE(AVG(stability), 0) AS avg_stability
-		FROM cards
-		WHERE deck_id = $1 AND NOT is_suspended`, deckID,
-	).Scan(&totalCards, &matureCards, &avgStability)
-	return
+	row, err := r.q.GetDeckMasteryStats(ctx, deckID)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	return int(row.TotalCards), int(row.MatureCards), float64(row.AvgStability), nil
 }
 
 func (r *CardRepository) GetWeakCards(ctx context.Context, userID uuid.UUID, limit int) ([]domain.Card, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT c.id, c.deck_id, c.front, c.back, c.tags, c.due, c.stability, c.difficulty, c.elapsed_days, c.scheduled_days, c.reps, c.lapses, c.state, c.last_review, c.is_suspended, c.position, c.created_at, c.updated_at
-		FROM cards c
-		JOIN decks d ON d.id = c.deck_id
-		WHERE d.user_id = $1 AND NOT c.is_suspended
-			AND (c.lapses > 2 OR (c.stability < 5 AND c.reps > 0))
-		ORDER BY c.lapses DESC, c.stability ASC
-		LIMIT $2`, userID, limit,
-	)
+	rows, err := r.q.GetWeakCards(ctx, sqlc.GetWeakCardsParams{
+		UserID: userID,
+		Limit:  int32(limit),
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var cards []domain.Card
-	for rows.Next() {
-		var c domain.Card
-		if err := rows.Scan(&c.ID, &c.DeckID, &c.Front, &c.Back, &c.Tags, &c.Due, &c.Stability, &c.Difficulty,
-			&c.ElapsedDays, &c.ScheduledDays, &c.Reps, &c.Lapses, &c.State, &c.LastReview,
-			&c.IsSuspended, &c.Position, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, err
-		}
-		cards = append(cards, c)
-	}
-	return cards, nil
+	return cardsFromSqlc(rows), nil
 }

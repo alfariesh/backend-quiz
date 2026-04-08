@@ -2,67 +2,64 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/repository/sqlc"
 )
 
 type MediaRepository struct {
-	db *pgxpool.Pool
+	q *sqlc.Queries
 }
 
-func NewMediaRepository(db *pgxpool.Pool) *MediaRepository {
-	return &MediaRepository{db: db}
+func NewMediaRepository(pool *pgxpool.Pool) *MediaRepository {
+	return &MediaRepository{q: sqlc.New(pool)}
 }
 
 func (r *MediaRepository) Create(ctx context.Context, media *domain.Media) error {
-	return r.db.QueryRow(ctx,
-		`INSERT INTO media (user_id, card_id, file_name, file_size, mime_type, r2_key, url)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, created_at`,
-		media.UserID, media.CardID, media.FileName, media.FileSize, media.MimeType, media.R2Key, media.URL,
-	).Scan(&media.ID, &media.CreatedAt)
+	result, err := r.q.CreateMedia(ctx, sqlc.CreateMediaParams{
+		UserID:   media.UserID,
+		CardID:   uuidToNullable(media.CardID),
+		FileName: media.FileName,
+		FileSize: int32(media.FileSize),
+		MimeType: media.MimeType,
+		R2Key:    media.R2Key,
+		Url:      media.URL,
+	})
+	if err != nil {
+		return err
+	}
+	*media = mediaFromSqlc(result)
+	return nil
 }
 
 func (r *MediaRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Media, error) {
-	var m domain.Media
-	err := r.db.QueryRow(ctx,
-		`SELECT id, user_id, card_id, file_name, file_size, mime_type, r2_key, url, created_at
-		FROM media WHERE id = $1`, id,
-	).Scan(&m.ID, &m.UserID, &m.CardID, &m.FileName, &m.FileSize, &m.MimeType, &m.R2Key, &m.URL, &m.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, domain.ErrNotFound
+	result, err := r.q.GetMediaByID(ctx, id)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
 	}
-	return &m, err
+	m := mediaFromSqlc(result)
+	return &m, nil
 }
 
 func (r *MediaRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM media WHERE id = $1`, id)
-	return err
+	return r.q.DeleteMedia(ctx, id)
 }
 
 func (r *MediaRepository) ListByCardID(ctx context.Context, cardID uuid.UUID) ([]domain.Media, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT id, user_id, card_id, file_name, file_size, mime_type, r2_key, url, created_at
-		FROM media WHERE card_id = $1
-		ORDER BY created_at`, cardID,
-	)
+	rows, err := r.q.ListMediaByCardID(ctx, uuidToNullable(&cardID))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var media []domain.Media
-	for rows.Next() {
-		var m domain.Media
-		if err := rows.Scan(&m.ID, &m.UserID, &m.CardID, &m.FileName, &m.FileSize, &m.MimeType, &m.R2Key, &m.URL, &m.CreatedAt); err != nil {
-			return nil, err
-		}
-		media = append(media, m)
+	media := make([]domain.Media, len(rows))
+	for i, row := range rows {
+		media[i] = mediaFromSqlc(row)
 	}
 	return media, nil
 }
