@@ -19,5 +19,23 @@ body:
     {
       "question_id": "{{question_id}}",
       "answer": "A",
-      "duration_ms": 3000
+      "duration_ms": 3000,
+      "rating": 3,
+      "fsrs_card": {
+        "due": "2026-04-09T00:00:00Z",
+        "stability": 2.5,
+        "difficulty": 5.0,
+        "elapsed_days": 1,
+        "scheduled_days": 3,
+        "reps": 1,
+        "lapses": 0,
+        "state": 1,
+        "last_review": "2026-04-08T00:00:00Z"
+      },
+      "fsrs_log": {
+        "scheduled_days": 3,
+        "elapsed_days": 1,
+        "stability": 2.5,
+        "difficulty": 5.0
+      }
     }

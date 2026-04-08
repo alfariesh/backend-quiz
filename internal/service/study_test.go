@@ -663,3 +663,75 @@ func TestStudyService_EndSession_Forbidden(t *testing.T) {
 	_, err := svc.EndSession(ctx, uuid.New(), session.ID)
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
+
+// --- GetReminders ---
+
+func TestStudyService_GetReminders_Success(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+	userID := uuid.New()
+
+	deckID1, deckID2 := uuid.New(), uuid.New()
+	summaries := []domain.DeckDueSummary{
+		{DeckID: deckID1, DeckName: "Fiqh", NewCount: 5, DueNow: 10, DueSoon: 3},
+		{DeckID: deckID2, DeckName: "Aqidah", NewCount: 2, DueNow: 8, DueSoon: 1},
+	}
+
+	nextDue := time.Now().Add(2 * time.Hour)
+
+	cardRepo.On("GetUpcomingDueSummary", ctx, userID, mock.AnythingOfType("time.Time"), mock.AnythingOfType("time.Time")).Return(summaries, nil)
+	cardRepo.On("GetNextDueAt", ctx, userID, mock.AnythingOfType("time.Time")).Return(&nextDue, nil)
+	reviewRepo.On("CountByUserAndDate", ctx, userID, mock.AnythingOfType("time.Time")).Return(5, nil)
+
+	// Access statsRepo from the service's internal field via mock setup
+	statsRepo := svc.statsRepo.(*mockStatsRepo)
+	statsRepo.On("GetStreak", ctx, userID).Return(7, nil)
+
+	result, err := svc.GetReminders(ctx, userID, 24)
+
+	require.NoError(t, err)
+	assert.Len(t, result.Decks, 2)
+	assert.Equal(t, 18, result.TotalDue)  // 10+8
+	assert.Equal(t, 4, result.DueSoon)    // 3+1
+	assert.Equal(t, 7, result.Streak)
+	assert.True(t, result.StudiedToday)   // todayCount=5 > 0
+	assert.NotNil(t, result.NextDueAt)
+}
+
+func TestStudyService_GetReminders_NoStudyToday(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+	userID := uuid.New()
+
+	cardRepo.On("GetUpcomingDueSummary", ctx, userID, mock.AnythingOfType("time.Time"), mock.AnythingOfType("time.Time")).Return([]domain.DeckDueSummary{}, nil)
+	cardRepo.On("GetNextDueAt", ctx, userID, mock.AnythingOfType("time.Time")).Return((*time.Time)(nil), nil)
+	reviewRepo.On("CountByUserAndDate", ctx, userID, mock.AnythingOfType("time.Time")).Return(0, nil)
+
+	statsRepo := svc.statsRepo.(*mockStatsRepo)
+	statsRepo.On("GetStreak", ctx, userID).Return(0, nil)
+
+	result, err := svc.GetReminders(ctx, userID, 12)
+
+	require.NoError(t, err)
+	assert.Empty(t, result.Decks)
+	assert.Equal(t, 0, result.TotalDue)
+	assert.Equal(t, 0, result.Streak)
+	assert.False(t, result.StudiedToday)
+	assert.Nil(t, result.NextDueAt)
+}
+
+func TestStudyService_GetReminders_DueSummaryError(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+	userID := uuid.New()
+
+	cardRepo.On("GetUpcomingDueSummary", ctx, userID, mock.AnythingOfType("time.Time"), mock.AnythingOfType("time.Time")).Return([]domain.DeckDueSummary(nil), assert.AnError)
+
+	result, err := svc.GetReminders(ctx, userID, 24)
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
+}

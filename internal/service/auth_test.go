@@ -305,6 +305,9 @@ func TestAuthService_UpdateProfile_AllFields(t *testing.T) {
 		weights[i] = float64(i) * 0.1
 	}
 
+	reminderEnabled := true
+	reminderTime := "08:00"
+
 	result, err := svc.UpdateProfile(ctx, userID, UpdateProfileRequest{
 		DisplayName:      &name,
 		Timezone:         &tz,
@@ -312,6 +315,8 @@ func TestAuthService_UpdateProfile_AllFields(t *testing.T) {
 		DailyNewLimit:    &newLimit,
 		DailyReviewLimit: &reviewLimit,
 		FSRSWeights:      weights,
+		ReminderEnabled:  &reminderEnabled,
+		ReminderTime:     &reminderTime,
 	})
 
 	require.NoError(t, err)
@@ -321,6 +326,8 @@ func TestAuthService_UpdateProfile_AllFields(t *testing.T) {
 	assert.Equal(t, 30, result.DailyNewLimit)
 	assert.Equal(t, 300, result.DailyReviewLimit)
 	assert.Equal(t, weights, result.FSRSWeights)
+	assert.True(t, result.ReminderEnabled)
+	assert.Equal(t, "08:00", result.ReminderTime)
 	repo.AssertExpectations(t)
 }
 

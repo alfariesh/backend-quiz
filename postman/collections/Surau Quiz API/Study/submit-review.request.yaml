@@ -17,5 +17,22 @@ body:
     {
       "card_id": "{{card_id}}",
       "rating": 3,
-      "duration_ms": 5000
+      "duration_ms": 5000,
+      "card": {
+        "due": "2026-04-09T00:00:00Z",
+        "stability": 2.5,
+        "difficulty": 5.0,
+        "elapsed_days": 1,
+        "scheduled_days": 3,
+        "reps": 1,
+        "lapses": 0,
+        "state": 1,
+        "last_review": "2026-04-08T00:00:00Z"
+      },
+      "log": {
+        "scheduled_days": 3,
+        "elapsed_days": 1,
+        "stability": 2.5,
+        "difficulty": 5.0
+      }
     }

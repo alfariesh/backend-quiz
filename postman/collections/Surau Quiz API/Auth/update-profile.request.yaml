@@ -16,5 +16,11 @@ body:
       "timezone": "UTC",
       "desired_retention": 0.9,
       "daily_new_limit": 20,
-      "daily_review_limit": 200
+      "daily_review_limit": 200,
+      "fsrs_weights": [
+        0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14,
+        0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61, 0.23, 2.74
+      ],
+      "reminder_enabled": true,
+      "reminder_time": "08:00"
     }
