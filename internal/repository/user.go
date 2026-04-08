@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -11,6 +13,23 @@ import (
 	"github.com/rekanesiads/backend-quiz/internal/domain"
 	"github.com/rekanesiads/backend-quiz/internal/repository/sqlc"
 )
+
+func stringToTime(s string) pgtype.Time {
+	if s == "" {
+		return pgtype.Time{}
+	}
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return pgtype.Time{}
+	}
+	h, err1 := strconv.Atoi(parts[0])
+	m, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil {
+		return pgtype.Time{}
+	}
+	micros := int64(h)*3_600_000_000 + int64(m)*60_000_000
+	return pgtype.Time{Microseconds: micros, Valid: true}
+}
 
 type UserRepository struct {
 	q *sqlc.Queries
@@ -78,6 +97,8 @@ func (r *UserRepository) Update(ctx context.Context, user *domain.User) error {
 		DailyNewLimit:    pgtype.Int4{Int32: int32(user.DailyNewLimit), Valid: true},
 		DailyReviewLimit: pgtype.Int4{Int32: int32(user.DailyReviewLimit), Valid: true},
 		FsrsWeights:      weights,
+		ReminderEnabled:  pgtype.Bool{Bool: user.ReminderEnabled, Valid: true},
+		ReminderTime:     stringToTime(user.ReminderTime),
 	})
 	if err != nil {
 		return err

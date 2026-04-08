@@ -50,7 +50,7 @@ func (q *Queries) CreateOAuthAccount(ctx context.Context, arg CreateOAuthAccount
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash, display_name, timezone, desired_retention, daily_new_limit, daily_review_limit)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, email, password_hash, display_name, timezone, desired_retention, daily_new_limit, daily_review_limit, fsrs_weights, created_at, updated_at
+RETURNING id, email, password_hash, display_name, timezone, desired_retention, daily_new_limit, daily_review_limit, fsrs_weights, created_at, updated_at, reminder_enabled, reminder_time
 `
 
 type CreateUserParams struct {
@@ -86,6 +86,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.FsrsWeights,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReminderEnabled,
+		&i.ReminderTime,
 	)
 	return i, err
 }
@@ -156,7 +158,7 @@ func (q *Queries) GetOAuthAccountsByUserID(ctx context.Context, userID uuid.UUID
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, display_name, timezone, desired_retention, daily_new_limit, daily_review_limit, fsrs_weights, created_at, updated_at FROM users WHERE email = $1
+SELECT id, email, password_hash, display_name, timezone, desired_retention, daily_new_limit, daily_review_limit, fsrs_weights, created_at, updated_at, reminder_enabled, reminder_time FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -174,12 +176,14 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.FsrsWeights,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReminderEnabled,
+		&i.ReminderTime,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, display_name, timezone, desired_retention, daily_new_limit, daily_review_limit, fsrs_weights, created_at, updated_at FROM users WHERE id = $1
+SELECT id, email, password_hash, display_name, timezone, desired_retention, daily_new_limit, daily_review_limit, fsrs_weights, created_at, updated_at, reminder_enabled, reminder_time FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -197,6 +201,8 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.FsrsWeights,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReminderEnabled,
+		&i.ReminderTime,
 	)
 	return i, err
 }
@@ -209,9 +215,11 @@ UPDATE users SET
     daily_new_limit = COALESCE($5, daily_new_limit),
     daily_review_limit = COALESCE($6, daily_review_limit),
     fsrs_weights = COALESCE($7, fsrs_weights),
+    reminder_enabled = COALESCE($8, reminder_enabled),
+    reminder_time = COALESCE($9, reminder_time),
     updated_at = now()
 WHERE id = $1
-RETURNING id, email, password_hash, display_name, timezone, desired_retention, daily_new_limit, daily_review_limit, fsrs_weights, created_at, updated_at
+RETURNING id, email, password_hash, display_name, timezone, desired_retention, daily_new_limit, daily_review_limit, fsrs_weights, created_at, updated_at, reminder_enabled, reminder_time
 `
 
 type UpdateUserParams struct {
@@ -222,6 +230,8 @@ type UpdateUserParams struct {
 	DailyNewLimit    pgtype.Int4   `json:"daily_new_limit"`
 	DailyReviewLimit pgtype.Int4   `json:"daily_review_limit"`
 	FsrsWeights      []float32     `json:"fsrs_weights"`
+	ReminderEnabled  pgtype.Bool   `json:"reminder_enabled"`
+	ReminderTime     pgtype.Time   `json:"reminder_time"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
@@ -233,6 +243,8 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		arg.DailyNewLimit,
 		arg.DailyReviewLimit,
 		arg.FsrsWeights,
+		arg.ReminderEnabled,
+		arg.ReminderTime,
 	)
 	var i User
 	err := row.Scan(
@@ -247,6 +259,8 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.FsrsWeights,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReminderEnabled,
+		&i.ReminderTime,
 	)
 	return i, err
 }

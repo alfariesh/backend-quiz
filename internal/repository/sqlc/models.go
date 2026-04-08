@@ -178,15 +178,17 @@ type StudySession struct {
 }
 
 type User struct {
-	ID               uuid.UUID `json:"id"`
-	Email            string    `json:"email"`
-	PasswordHash     string    `json:"password_hash"`
-	DisplayName      string    `json:"display_name"`
-	Timezone         string    `json:"timezone"`
-	DesiredRetention float32   `json:"desired_retention"`
-	DailyNewLimit    int32     `json:"daily_new_limit"`
-	DailyReviewLimit int32     `json:"daily_review_limit"`
-	FsrsWeights      []float32 `json:"fsrs_weights"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID               uuid.UUID   `json:"id"`
+	Email            string      `json:"email"`
+	PasswordHash     string      `json:"password_hash"`
+	DisplayName      string      `json:"display_name"`
+	Timezone         string      `json:"timezone"`
+	DesiredRetention float32     `json:"desired_retention"`
+	DailyNewLimit    int32       `json:"daily_new_limit"`
+	DailyReviewLimit int32       `json:"daily_review_limit"`
+	FsrsWeights      []float32   `json:"fsrs_weights"`
+	CreatedAt        time.Time   `json:"created_at"`
+	UpdatedAt        time.Time   `json:"updated_at"`
+	ReminderEnabled  bool        `json:"reminder_enabled"`
+	ReminderTime     pgtype.Time `json:"reminder_time"`
 }

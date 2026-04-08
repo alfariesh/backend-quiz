@@ -17,6 +17,8 @@ UPDATE users SET
     daily_new_limit = COALESCE(sqlc.narg('daily_new_limit'), daily_new_limit),
     daily_review_limit = COALESCE(sqlc.narg('daily_review_limit'), daily_review_limit),
     fsrs_weights = COALESCE(sqlc.narg('fsrs_weights'), fsrs_weights),
+    reminder_enabled = COALESCE(sqlc.narg('reminder_enabled'), reminder_enabled),
+    reminder_time = COALESCE(sqlc.narg('reminder_time'), reminder_time),
     updated_at = now()
 WHERE id = $1
 RETURNING *;

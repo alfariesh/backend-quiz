@@ -2,6 +2,7 @@ package repository
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -112,9 +113,20 @@ func userFromSqlc(u sqlc.User) domain.User {
 		DailyNewLimit:    int(u.DailyNewLimit),
 		DailyReviewLimit: int(u.DailyReviewLimit),
 		FSRSWeights:      weights,
+		ReminderEnabled:  u.ReminderEnabled,
+		ReminderTime:     pgTimeToString(u.ReminderTime),
 		CreatedAt:        u.CreatedAt,
 		UpdatedAt:        u.UpdatedAt,
 	}
+}
+
+func pgTimeToString(t pgtype.Time) string {
+	if !t.Valid {
+		return "08:00"
+	}
+	hours := t.Microseconds / 3_600_000_000
+	minutes := (t.Microseconds % 3_600_000_000) / 60_000_000
+	return fmt.Sprintf("%02d:%02d", hours, minutes)
 }
 
 // Deck converters

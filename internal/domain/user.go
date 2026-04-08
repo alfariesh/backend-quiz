@@ -17,6 +17,8 @@ type User struct {
 	DailyNewLimit    int        `json:"daily_new_limit"`
 	DailyReviewLimit int        `json:"daily_review_limit"`
 	FSRSWeights      []float64  `json:"fsrs_weights,omitempty"`
+	ReminderEnabled  bool       `json:"reminder_enabled"`
+	ReminderTime     string     `json:"reminder_time"`
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`
 }

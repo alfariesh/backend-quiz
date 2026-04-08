@@ -52,6 +52,8 @@ type UpdateProfileRequest struct {
 	DailyNewLimit    *int      `json:"daily_new_limit,omitempty" validate:"omitempty,min=0,max=9999"`
 	DailyReviewLimit *int      `json:"daily_review_limit,omitempty" validate:"omitempty,min=0,max=9999"`
 	FSRSWeights      []float64 `json:"fsrs_weights,omitempty" validate:"omitempty,len=19"`
+	ReminderEnabled  *bool     `json:"reminder_enabled,omitempty"`
+	ReminderTime     *string   `json:"reminder_time,omitempty" validate:"omitempty,len=5"`
 }
 
 func (s *AuthService) Register(ctx context.Context, req RegisterRequest) (*TokenPair, *domain.User, error) {
@@ -173,6 +175,12 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uuid.UUID, req U
 	}
 	if req.FSRSWeights != nil {
 		user.FSRSWeights = req.FSRSWeights
+	}
+	if req.ReminderEnabled != nil {
+		user.ReminderEnabled = *req.ReminderEnabled
+	}
+	if req.ReminderTime != nil {
+		user.ReminderTime = *req.ReminderTime
 	}
 
 	if err := s.userRepo.Update(ctx, user); err != nil {
