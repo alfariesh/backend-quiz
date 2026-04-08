@@ -266,6 +266,89 @@ func (q *Queries) GetDueCards(ctx context.Context, arg GetDueCardsParams) ([]Car
 	return items, nil
 }
 
+const getNextDueAt = `-- name: GetNextDueAt :one
+SELECT MIN(due) AS next_due
+FROM cards c
+JOIN decks d ON d.id = c.deck_id
+WHERE d.user_id = $1
+    AND NOT c.is_suspended
+    AND NOT d.is_archived
+    AND c.state IN (1, 2, 3)
+    AND c.due > $2
+`
+
+type GetNextDueAtParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Due    time.Time `json:"due"`
+}
+
+func (q *Queries) GetNextDueAt(ctx context.Context, arg GetNextDueAtParams) (interface{}, error) {
+	row := q.db.QueryRow(ctx, getNextDueAt, arg.UserID, arg.Due)
+	var next_due interface{}
+	err := row.Scan(&next_due)
+	return next_due, err
+}
+
+const getUpcomingDueSummary = `-- name: GetUpcomingDueSummary :many
+SELECT
+    d.id AS deck_id,
+    d.name AS deck_name,
+    COUNT(*) FILTER (WHERE c.state = 0)::int AS new_count,
+    COUNT(*) FILTER (WHERE c.state IN (1, 2, 3) AND c.due <= $2)::int AS due_now,
+    COUNT(*) FILTER (WHERE c.state IN (1, 2, 3) AND c.due > $2 AND c.due <= $3)::int AS due_soon
+FROM cards c
+JOIN decks d ON d.id = c.deck_id
+WHERE d.user_id = $1
+    AND NOT c.is_suspended
+    AND NOT d.is_archived
+GROUP BY d.id, d.name
+HAVING COUNT(*) FILTER (WHERE c.state = 0) > 0
+    OR COUNT(*) FILTER (WHERE c.state IN (1, 2, 3) AND c.due <= $3) > 0
+ORDER BY
+    COUNT(*) FILTER (WHERE c.state IN (1, 2, 3) AND c.due <= $2) DESC,
+    d.name
+`
+
+type GetUpcomingDueSummaryParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Due    time.Time `json:"due"`
+	Due_2  time.Time `json:"due_2"`
+}
+
+type GetUpcomingDueSummaryRow struct {
+	DeckID   uuid.UUID `json:"deck_id"`
+	DeckName string    `json:"deck_name"`
+	NewCount int32     `json:"new_count"`
+	DueNow   int32     `json:"due_now"`
+	DueSoon  int32     `json:"due_soon"`
+}
+
+func (q *Queries) GetUpcomingDueSummary(ctx context.Context, arg GetUpcomingDueSummaryParams) ([]GetUpcomingDueSummaryRow, error) {
+	rows, err := q.db.Query(ctx, getUpcomingDueSummary, arg.UserID, arg.Due, arg.Due_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetUpcomingDueSummaryRow{}
+	for rows.Next() {
+		var i GetUpcomingDueSummaryRow
+		if err := rows.Scan(
+			&i.DeckID,
+			&i.DeckName,
+			&i.NewCount,
+			&i.DueNow,
+			&i.DueSoon,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getWeakCards = `-- name: GetWeakCards :many
 SELECT c.id, c.deck_id, c.front, c.back, c.tags, c.due, c.stability, c.difficulty, c.elapsed_days, c.scheduled_days, c.reps, c.lapses, c.state, c.last_review, c.is_suspended, c.position, c.created_at, c.updated_at, c.content_type FROM cards c
 JOIN decks d ON d.id = c.deck_id

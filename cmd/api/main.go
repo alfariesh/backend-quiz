@@ -82,7 +82,7 @@ func run() error {
 	authSvc := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.RefreshDuration)
 	deckSvc := service.NewDeckService(deckRepo, cardRepo)
 	cardSvc := service.NewCardService(cardRepo, deckRepo)
-	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, quizAttemptRepo)
 	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo, reviewRepo)
 
@@ -177,6 +177,7 @@ func run() error {
 
 			// Study
 			r.Route("/study", func(r chi.Router) {
+				r.Get("/reminders", studyH.Reminders)
 				r.Post("/sessions", studyH.StartSession)
 				r.Get("/sessions/{sessionID}", studyH.GetSession)
 				r.Post("/sessions/{sessionID}/review", studyH.SubmitReview)

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -122,5 +123,23 @@ func (h *StudyHandler) EndSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusOK, session)
+}
+
+func (h *StudyHandler) Reminders(w http.ResponseWriter, r *http.Request) {
+	userID, _ := middleware.GetUserID(r.Context())
+
+	hoursAhead := 24
+	if hrs := r.URL.Query().Get("hours"); hrs != "" {
+		if parsed, err := strconv.Atoi(hrs); err == nil && parsed >= 1 && parsed <= 168 {
+			hoursAhead = parsed
+		}
+	}
+
+	result, err := h.studySvc.GetReminders(r.Context(), userID, hoursAhead)
+	if err != nil {
+		HandleError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, result)
 }
 

@@ -217,6 +217,46 @@ func (r *CardRepository) GetDeckMasteryStats(ctx context.Context, deckID uuid.UU
 	return int(row.TotalCards), int(row.MatureCards), float64(row.AvgStability), nil
 }
 
+func (r *CardRepository) GetNextDueAt(ctx context.Context, userID uuid.UUID, now time.Time) (*time.Time, error) {
+	result, err := r.q.GetNextDueAt(ctx, sqlc.GetNextDueAtParams{
+		UserID: userID,
+		Due:    now,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, nil
+	}
+	if t, ok := result.(time.Time); ok {
+		return &t, nil
+	}
+	return nil, nil
+}
+
+func (r *CardRepository) GetUpcomingDueSummary(ctx context.Context, userID uuid.UUID, now time.Time, horizon time.Time) ([]domain.DeckDueSummary, error) {
+	rows, err := r.q.GetUpcomingDueSummary(ctx, sqlc.GetUpcomingDueSummaryParams{
+		UserID: userID,
+		Due:    now,
+		Due_2:  horizon,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	summaries := make([]domain.DeckDueSummary, len(rows))
+	for i, row := range rows {
+		summaries[i] = domain.DeckDueSummary{
+			DeckID:   row.DeckID,
+			DeckName: row.DeckName,
+			NewCount: int(row.NewCount),
+			DueNow:   int(row.DueNow),
+			DueSoon:  int(row.DueSoon),
+		}
+	}
+	return summaries, nil
+}
+
 func (r *CardRepository) GetWeakCards(ctx context.Context, userID uuid.UUID, limit int) ([]domain.Card, error) {
 	rows, err := r.q.GetWeakCards(ctx, sqlc.GetWeakCardsParams{
 		UserID: userID,

@@ -15,6 +15,7 @@ type StudyService struct {
 	reviewRepo  domain.ReviewRepository
 	sessionRepo domain.StudySessionRepository
 	userRepo    domain.UserRepository
+	statsRepo   domain.StatsRepository
 }
 
 func NewStudyService(
@@ -22,12 +23,14 @@ func NewStudyService(
 	reviewRepo domain.ReviewRepository,
 	sessionRepo domain.StudySessionRepository,
 	userRepo domain.UserRepository,
+	statsRepo domain.StatsRepository,
 ) *StudyService {
 	return &StudyService{
 		cardRepo:    cardRepo,
 		reviewRepo:  reviewRepo,
 		sessionRepo: sessionRepo,
 		userRepo:    userRepo,
+		statsRepo:   statsRepo,
 	}
 }
 
@@ -318,6 +321,46 @@ func (s *StudyService) EndSession(ctx context.Context, userID uuid.UUID, session
 		return nil, err
 	}
 	return session, nil
+}
+
+type ReminderResponse struct {
+	Decks        []domain.DeckDueSummary `json:"decks"`
+	TotalDue     int                     `json:"total_due"`
+	DueSoon      int                     `json:"due_soon"`
+	Streak       int                     `json:"streak"`
+	StudiedToday bool                    `json:"studied_today"`
+	NextDueAt    *time.Time              `json:"next_due_at,omitempty"`
+}
+
+func (s *StudyService) GetReminders(ctx context.Context, userID uuid.UUID, hoursAhead int) (*ReminderResponse, error) {
+	now := time.Now()
+	horizon := now.Add(time.Duration(hoursAhead) * time.Hour)
+
+	summaries, err := s.cardRepo.GetUpcomingDueSummary(ctx, userID, now, horizon)
+	if err != nil {
+		return nil, err
+	}
+
+	totalDue, dueSoon := 0, 0
+	for _, s := range summaries {
+		totalDue += s.DueNow
+		dueSoon += s.DueSoon
+	}
+
+	streak, _ := s.statsRepo.GetStreak(ctx, userID)
+
+	todayCount, _ := s.reviewRepo.CountByUserAndDate(ctx, userID, now)
+
+	nextDue, _ := s.cardRepo.GetNextDueAt(ctx, userID, now)
+
+	return &ReminderResponse{
+		Decks:        summaries,
+		TotalDue:     totalDue,
+		DueSoon:      dueSoon,
+		Streak:       streak,
+		StudiedToday: todayCount > 0,
+		NextDueAt:    nextDue,
+	}, nil
 }
 
 func (s *StudyService) countCards(cards []domain.Card) DueCounts {

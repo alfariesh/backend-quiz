@@ -95,6 +95,35 @@ SELECT
 FROM cards
 WHERE deck_id = $1 AND NOT is_suspended;
 
+-- name: GetNextDueAt :one
+SELECT MIN(due) AS next_due
+FROM cards c
+JOIN decks d ON d.id = c.deck_id
+WHERE d.user_id = $1
+    AND NOT c.is_suspended
+    AND NOT d.is_archived
+    AND c.state IN (1, 2, 3)
+    AND c.due > $2;
+
+-- name: GetUpcomingDueSummary :many
+SELECT
+    d.id AS deck_id,
+    d.name AS deck_name,
+    COUNT(*) FILTER (WHERE c.state = 0)::int AS new_count,
+    COUNT(*) FILTER (WHERE c.state IN (1, 2, 3) AND c.due <= $2)::int AS due_now,
+    COUNT(*) FILTER (WHERE c.state IN (1, 2, 3) AND c.due > $2 AND c.due <= $3)::int AS due_soon
+FROM cards c
+JOIN decks d ON d.id = c.deck_id
+WHERE d.user_id = $1
+    AND NOT c.is_suspended
+    AND NOT d.is_archived
+GROUP BY d.id, d.name
+HAVING COUNT(*) FILTER (WHERE c.state = 0) > 0
+    OR COUNT(*) FILTER (WHERE c.state IN (1, 2, 3) AND c.due <= $3) > 0
+ORDER BY
+    COUNT(*) FILTER (WHERE c.state IN (1, 2, 3) AND c.due <= $2) DESC,
+    d.name;
+
 -- name: GetWeakCards :many
 SELECT c.* FROM cards c
 JOIN decks d ON d.id = c.deck_id

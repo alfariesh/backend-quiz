@@ -93,4 +93,14 @@ type CardRepository interface {
 
 	GetDeckMasteryStats(ctx context.Context, deckID uuid.UUID) (totalCards, matureCards int, avgStability float64, err error)
 	GetWeakCards(ctx context.Context, userID uuid.UUID, limit int) ([]Card, error)
+	GetUpcomingDueSummary(ctx context.Context, userID uuid.UUID, now time.Time, horizon time.Time) ([]DeckDueSummary, error)
+	GetNextDueAt(ctx context.Context, userID uuid.UUID, now time.Time) (*time.Time, error)
+}
+
+type DeckDueSummary struct {
+	DeckID   uuid.UUID `json:"deck_id"`
+	DeckName string    `json:"deck_name"`
+	NewCount int       `json:"new_count"`
+	DueNow   int       `json:"due_now"`
+	DueSoon  int       `json:"due_soon"`
 }

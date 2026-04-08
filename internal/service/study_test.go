@@ -1,15 +1,22 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
 )
+
+
+func newTestStudyService(cardRepo *mockCardRepo, reviewRepo *mockReviewRepo, sessionRepo *mockSessionRepo, userRepo *mockUserRepo) *StudyService {
+	return NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, new(mockStatsRepo))
+}
 
 // --- validateFSRSState ---
 
@@ -275,4 +282,384 @@ func TestCountCards_AllReview(t *testing.T) {
 	assert.Equal(t, 0, counts.Learning)
 	assert.Equal(t, 2, counts.Review)
 	assert.Equal(t, 2, counts.Total)
+}
+
+// =============================================================================
+// StudyService method tests (with mocks)
+// =============================================================================
+
+func studyTestUser() *domain.User {
+	return &domain.User{
+		ID:               uuid.New(),
+		Email:            "study@test.com",
+		DailyNewLimit:    20,
+		DailyReviewLimit: 200,
+	}
+}
+
+func studyTestSession(userID uuid.UUID, deckID *uuid.UUID) *domain.StudySession {
+	return &domain.StudySession{
+		ID:     uuid.New(),
+		UserID: userID,
+		DeckID: deckID,
+	}
+}
+
+// --- StartSession ---
+
+func TestStudyService_StartSession_Success(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	user := studyTestUser()
+	deckID := uuid.New()
+
+	userRepo.On("GetByID", ctx, user.ID).Return(user, nil)
+	cardRepo.On("GetDueCards", ctx, deckID, mock.AnythingOfType("time.Time"), 20, 200).Return([]domain.Card{
+		{ID: uuid.New(), State: domain.CardStateNew},
+		{ID: uuid.New(), State: domain.CardStateReview},
+	}, nil)
+	sessionRepo.On("Create", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
+
+	resp, err := svc.StartSession(ctx, user.ID, StartSessionRequest{DeckID: deckID})
+
+	require.NoError(t, err)
+	assert.NotNil(t, resp.Session)
+	assert.Len(t, resp.Cards, 2)
+	assert.Equal(t, 1, resp.Counts.New)
+	assert.Equal(t, 1, resp.Counts.Review)
+	assert.Equal(t, 2, resp.Counts.Total)
+	sessionRepo.AssertExpectations(t)
+}
+
+func TestStudyService_StartSession_UserNotFound(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	userRepo.On("GetByID", ctx, userID).Return(nil, domain.ErrNotFound)
+
+	_, err := svc.StartSession(ctx, userID, StartSessionRequest{DeckID: uuid.New()})
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// --- GetSession ---
+
+func TestStudyService_GetSession_Success(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	session := studyTestSession(userID, &deckID)
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+
+	result, err := svc.GetSession(ctx, userID, session.ID)
+
+	require.NoError(t, err)
+	assert.Equal(t, session.ID, result.ID)
+}
+
+func TestStudyService_GetSession_Forbidden(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	session := studyTestSession(uuid.New(), &deckID)
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+
+	_, err := svc.GetSession(ctx, uuid.New(), session.ID) // different user
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+// --- SubmitReview ---
+
+func TestStudyService_SubmitReview_Success(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	session := studyTestSession(userID, &deckID)
+	cardID := uuid.New()
+	card := &domain.Card{ID: cardID, DeckID: deckID, State: domain.CardStateNew}
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+	cardRepo.On("GetByID", ctx, cardID).Return(card, nil)
+	cardRepo.On("UpdateFSRS", ctx, mock.AnythingOfType("*domain.Card")).Return(nil)
+	reviewRepo.On("Create", ctx, mock.AnythingOfType("*domain.ReviewLog")).Return(nil)
+	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
+
+	now := time.Now()
+	result, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{
+		CardID:     cardID,
+		Rating:     3,
+		DurationMS: 5000,
+		Card: FSRSCardState{
+			Due: now.Add(24 * time.Hour), Stability: 2.5, Difficulty: 5.0,
+			State: 1, LastReview: now,
+		},
+		Log: FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.5, Difficulty: 5.0},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, cardID, result.Card.ID)
+	assert.Equal(t, domain.ReviewSourceFlashcard, result.ReviewLog.Source)
+	assert.Equal(t, domain.CardStateNew, result.ReviewLog.State) // state before
+	assert.Equal(t, 1, session.NewCount)                         // incremented
+	cardRepo.AssertExpectations(t)
+}
+
+func TestStudyService_SubmitReview_SessionEnded(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	endedAt := time.Now()
+	session := &domain.StudySession{ID: uuid.New(), UserID: userID, DeckID: &deckID, EndedAt: &endedAt}
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+
+	_, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{CardID: uuid.New()})
+	assert.ErrorIs(t, err, domain.ErrSessionEnded)
+}
+
+func TestStudyService_SubmitReview_CardSuspended(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	session := studyTestSession(userID, &deckID)
+	cardID := uuid.New()
+	card := &domain.Card{ID: cardID, IsSuspended: true}
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+	cardRepo.On("GetByID", ctx, cardID).Return(card, nil)
+
+	_, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{CardID: cardID})
+	assert.ErrorIs(t, err, domain.ErrCardSuspended)
+}
+
+func TestStudyService_SubmitReview_InvalidFSRS(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	session := studyTestSession(userID, &deckID)
+	cardID := uuid.New()
+	card := &domain.Card{ID: cardID}
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+	cardRepo.On("GetByID", ctx, cardID).Return(card, nil)
+
+	_, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{
+		CardID: cardID, Rating: 3,
+		Card: FSRSCardState{Stability: -1}, // invalid
+	})
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+}
+
+// --- BatchReview ---
+
+func TestStudyService_BatchReview_Success(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	session := studyTestSession(userID, &deckID)
+	card1ID, card2ID := uuid.New(), uuid.New()
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+	cardRepo.On("GetByID", ctx, card1ID).Return(&domain.Card{ID: card1ID, State: domain.CardStateNew}, nil)
+	cardRepo.On("GetByID", ctx, card2ID).Return(&domain.Card{ID: card2ID, State: domain.CardStateReview}, nil)
+	cardRepo.On("UpdateFSRS", ctx, mock.AnythingOfType("*domain.Card")).Return(nil)
+	reviewRepo.On("Create", ctx, mock.AnythingOfType("*domain.ReviewLog")).Return(nil)
+	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
+
+	now := time.Now()
+	validCard := FSRSCardState{
+		Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0,
+		State: 1, LastReview: now,
+	}
+
+	result, err := svc.BatchReview(ctx, userID, session.ID, BatchReviewRequest{
+		Reviews: []BatchReviewItem{
+			{CardID: card1ID, Rating: 3, DurationMS: 3000, ReviewedAt: now, Card: validCard},
+			{CardID: card2ID, Rating: 4, DurationMS: 2000, ReviewedAt: now, Card: validCard},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Processed)
+	assert.Equal(t, 0, result.Errors)
+	assert.Equal(t, 1, session.NewCount)
+	assert.Equal(t, 1, session.ReviewCount)
+	assert.Equal(t, 5000, session.TotalDurationMS)
+}
+
+func TestStudyService_BatchReview_PartialErrors(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	session := studyTestSession(userID, &deckID)
+	goodCardID := uuid.New()
+	badCardID := uuid.New()
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+	cardRepo.On("GetByID", ctx, goodCardID).Return(&domain.Card{ID: goodCardID, State: domain.CardStateNew}, nil)
+	cardRepo.On("GetByID", ctx, badCardID).Return(nil, domain.ErrNotFound) // card not found
+	cardRepo.On("UpdateFSRS", ctx, mock.AnythingOfType("*domain.Card")).Return(nil)
+	reviewRepo.On("Create", ctx, mock.AnythingOfType("*domain.ReviewLog")).Return(nil)
+	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
+
+	now := time.Now()
+	validCard := FSRSCardState{
+		Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0,
+		State: 1, LastReview: now,
+	}
+
+	result, err := svc.BatchReview(ctx, userID, session.ID, BatchReviewRequest{
+		Reviews: []BatchReviewItem{
+			{CardID: goodCardID, Rating: 3, DurationMS: 3000, ReviewedAt: now, Card: validCard},
+			{CardID: badCardID, Rating: 3, DurationMS: 2000, ReviewedAt: now, Card: validCard},
+			{CardID: uuid.New(), Rating: 3, ReviewedAt: now, Card: FSRSCardState{Stability: -1}}, // invalid FSRS
+		},
+	})
+
+	require.NoError(t, err) // BatchReview itself doesn't fail
+	assert.Equal(t, 1, result.Processed)
+	assert.Equal(t, 2, result.Errors)
+}
+
+func TestStudyService_BatchReview_SessionEnded(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	endedAt := time.Now()
+	session := &domain.StudySession{ID: uuid.New(), UserID: userID, DeckID: &deckID, EndedAt: &endedAt}
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+
+	_, err := svc.BatchReview(ctx, userID, session.ID, BatchReviewRequest{
+		Reviews: []BatchReviewItem{{}},
+	})
+	assert.ErrorIs(t, err, domain.ErrSessionEnded)
+}
+
+func TestStudyService_BatchReview_Forbidden(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	session := studyTestSession(uuid.New(), &deckID) // owned by different user
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+
+	_, err := svc.BatchReview(ctx, uuid.New(), session.ID, BatchReviewRequest{
+		Reviews: []BatchReviewItem{{}},
+	})
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestStudyService_BatchReview_SkipsSuspendedCards(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	session := studyTestSession(userID, &deckID)
+	suspendedID := uuid.New()
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+	cardRepo.On("GetByID", ctx, suspendedID).Return(&domain.Card{ID: suspendedID, IsSuspended: true}, nil)
+	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
+
+	now := time.Now()
+	validCard := FSRSCardState{
+		Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0,
+		State: 1, LastReview: now,
+	}
+
+	result, err := svc.BatchReview(ctx, userID, session.ID, BatchReviewRequest{
+		Reviews: []BatchReviewItem{
+			{CardID: suspendedID, Rating: 3, ReviewedAt: now, Card: validCard},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.Processed)
+	assert.Equal(t, 1, result.Errors)
+}
+
+// --- EndSession ---
+
+func TestStudyService_EndSession_Success(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	session := studyTestSession(userID, &deckID)
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
+
+	result, err := svc.EndSession(ctx, userID, session.ID)
+
+	require.NoError(t, err)
+	assert.NotNil(t, result.EndedAt)
+}
+
+func TestStudyService_EndSession_AlreadyEnded(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	endedAt := time.Now()
+	session := &domain.StudySession{ID: uuid.New(), UserID: userID, DeckID: &deckID, EndedAt: &endedAt}
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+
+	_, err := svc.EndSession(ctx, userID, session.ID)
+	assert.ErrorIs(t, err, domain.ErrSessionEnded)
+}
+
+func TestStudyService_EndSession_Forbidden(t *testing.T) {
+	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
+	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	session := studyTestSession(uuid.New(), &deckID)
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+
+	_, err := svc.EndSession(ctx, uuid.New(), session.ID)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
