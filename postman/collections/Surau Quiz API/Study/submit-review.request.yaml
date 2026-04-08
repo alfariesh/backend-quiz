@@ -1,0 +1,21 @@
+$kind: http-request
+name: Submit Review
+method: POST
+url: '{{base_url}}/api/v1/study/sessions/{{session_id}}/review'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: session_id
+    value: '{{session_id}}'
+body:
+  type: json
+  content: |-
+    {
+      "card_id": "{{card_id}}",
+      "rating": 3,
+      "duration_ms": 5000
+    }

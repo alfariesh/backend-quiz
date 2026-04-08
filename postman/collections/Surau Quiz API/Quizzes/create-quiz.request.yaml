@@ -1,0 +1,21 @@
+$kind: http-request
+name: Create Quiz
+method: POST
+url: '{{base_url}}/api/v1/quizzes'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+body:
+  type: json
+  content: |-
+    {
+      "deck_id": "{{deck_id}}",
+      "title": "My Quiz",
+      "description": "Quiz description",
+      "quiz_type": "mcq",
+      "time_limit_seconds": 600,
+      "shuffle_questions": true
+    }

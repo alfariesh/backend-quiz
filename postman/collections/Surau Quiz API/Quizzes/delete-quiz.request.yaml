@@ -1,0 +1,11 @@
+$kind: http-request
+name: Delete Quiz
+method: DELETE
+url: '{{base_url}}/api/v1/quizzes/{{quiz_id}}'
+order: 5000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: quiz_id
+    value: '{{quiz_id}}'

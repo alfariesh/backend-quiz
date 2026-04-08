@@ -1,0 +1,12 @@
+$kind: http-request
+name: Leaderboard
+method: GET
+url: '{{base_url}}/api/v1/stats/leaderboard'
+order: 4000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+queryParams:
+  - key: limit
+    value: '10'
+    disabled: true

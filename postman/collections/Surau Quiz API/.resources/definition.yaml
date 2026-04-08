@@ -1,0 +1,27 @@
+$kind: collection
+name: Surau Quiz API
+variables:
+  - key: base_url
+    value: 'http://localhost:8080'
+  - key: access_token
+    value: ''
+  - key: refresh_token
+    value: ''
+  - key: deck_id
+    value: ''
+  - key: card_id
+    value: ''
+  - key: session_id
+    value: ''
+  - key: quiz_id
+    value: ''
+  - key: question_id
+    value: ''
+  - key: attempt_id
+    value: ''
+  - key: goal_id
+    value: ''
+  - key: media_id
+    value: ''
+  - key: share_code
+    value: ''

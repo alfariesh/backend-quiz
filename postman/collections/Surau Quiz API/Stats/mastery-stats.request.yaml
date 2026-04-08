@@ -1,0 +1,8 @@
+$kind: http-request
+name: Mastery Stats
+method: GET
+url: '{{base_url}}/api/v1/stats/mastery'
+order: 5000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'

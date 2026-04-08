@@ -1,0 +1,8 @@
+$kind: http-request
+name: Stats Heatmap
+method: GET
+url: '{{base_url}}/api/v1/stats/heatmap'
+order: 2000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'

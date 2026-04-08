@@ -1,0 +1,11 @@
+$kind: http-request
+name: Get Card
+method: GET
+url: '{{base_url}}/api/v1/cards/{{card_id}}'
+order: 4000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: card_id
+    value: '{{card_id}}'

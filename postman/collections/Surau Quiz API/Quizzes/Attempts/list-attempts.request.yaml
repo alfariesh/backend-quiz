@@ -1,0 +1,18 @@
+$kind: http-request
+name: List Attempts
+method: GET
+url: '{{base_url}}/api/v1/quizzes/{{quiz_id}}/attempts'
+order: 2000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: quiz_id
+    value: '{{quiz_id}}'
+queryParams:
+  - key: limit
+    value: '20'
+    disabled: true
+  - key: offset
+    value: '0'
+    disabled: true

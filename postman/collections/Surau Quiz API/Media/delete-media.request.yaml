@@ -1,0 +1,11 @@
+$kind: http-request
+name: Delete Media
+method: DELETE
+url: '{{base_url}}/api/v1/media/{{media_id}}'
+order: 3000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: media_id
+    value: '{{media_id}}'

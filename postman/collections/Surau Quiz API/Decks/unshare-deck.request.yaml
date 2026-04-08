@@ -1,0 +1,11 @@
+$kind: http-request
+name: Unshare Deck
+method: DELETE
+url: '{{base_url}}/api/v1/decks/{{deck_id}}/share'
+order: 11000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+pathVariables:
+  - key: deck_id
+    value: '{{deck_id}}'

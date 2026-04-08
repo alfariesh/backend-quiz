@@ -1,0 +1,8 @@
+$kind: http-request
+name: Stats Forecast
+method: GET
+url: '{{base_url}}/api/v1/stats/forecast'
+order: 3000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'

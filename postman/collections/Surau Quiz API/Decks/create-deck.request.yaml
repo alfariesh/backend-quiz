@@ -1,0 +1,18 @@
+$kind: http-request
+name: Create Deck
+method: POST
+url: '{{base_url}}/api/v1/decks'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+body:
+  type: json
+  content: |-
+    {
+      "name": "My Deck",
+      "description": "A description",
+      "new_cards_per_day": 20
+    }

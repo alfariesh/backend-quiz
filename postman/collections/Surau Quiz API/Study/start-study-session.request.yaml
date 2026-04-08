@@ -1,0 +1,14 @@
+$kind: http-request
+name: Start Study Session
+method: POST
+url: "{{base_url}}/api/v1/study/sessions"
+order: 1000
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{access_token}}
+body:
+  type: json
+  content: |-
+    {
+      "deck_id": "{{deck_id}}"
+    }

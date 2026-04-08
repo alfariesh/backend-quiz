@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Profile
+method: GET
+url: '{{base_url}}/api/v1/auth/me'
+order: 4000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'

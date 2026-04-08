@@ -1,0 +1,8 @@
+$kind: http-request
+name: Weak Areas
+method: GET
+url: '{{base_url}}/api/v1/stats/weak-areas'
+order: 6000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'

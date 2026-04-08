@@ -1,0 +1,18 @@
+$kind: http-request
+name: List Public Decks
+method: GET
+url: '{{base_url}}/api/v1/decks/public'
+order: 3000
+headers:
+  - key: Authorization
+    value: 'Bearer {{access_token}}'
+queryParams:
+  - key: q
+    value: ''
+    disabled: true
+  - key: limit
+    value: '20'
+    disabled: true
+  - key: offset
+    value: '0'
+    disabled: true
