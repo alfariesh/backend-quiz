@@ -83,6 +83,24 @@ type ReviewResult struct {
 	NextDue   time.Time        `json:"next_due"`
 }
 
+type BatchReviewRequest struct {
+	Reviews []BatchReviewItem `json:"reviews" validate:"required,min=1,max=500,dive"`
+}
+
+type BatchReviewItem struct {
+	CardID     uuid.UUID     `json:"card_id" validate:"required"`
+	Rating     int           `json:"rating" validate:"required,min=1,max=4"`
+	DurationMS int           `json:"duration_ms" validate:"min=0"`
+	ReviewedAt time.Time     `json:"reviewed_at" validate:"required"`
+	Card       FSRSCardState `json:"card" validate:"required"`
+	Log        FSRSLogState  `json:"log"`
+}
+
+type BatchReviewResult struct {
+	Processed int `json:"processed"`
+	Errors    int `json:"errors"`
+}
+
 func (s *StudyService) StartSession(ctx context.Context, userID uuid.UUID, req StartSessionRequest) (*StartSessionResponse, error) {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
@@ -200,6 +218,85 @@ func (s *StudyService) SubmitReview(ctx context.Context, userID uuid.UUID, sessi
 		Card:      *card,
 		ReviewLog: *reviewLog,
 		NextDue:   card.Due,
+	}, nil
+}
+
+func (s *StudyService) BatchReview(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID, req BatchReviewRequest) (*BatchReviewResult, error) {
+	session, err := s.sessionRepo.GetByID(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if session.UserID != userID {
+		return nil, domain.ErrForbidden
+	}
+	if session.EndedAt != nil {
+		return nil, domain.ErrSessionEnded
+	}
+
+	processed, errCount := 0, 0
+	newInc, reviewInc, relearnInc, totalDuration := 0, 0, 0, 0
+
+	for _, item := range req.Reviews {
+		if err := validateFSRSState(item.Card); err != nil {
+			errCount++
+			continue
+		}
+
+		card, err := s.cardRepo.GetByID(ctx, item.CardID)
+		if err != nil || card.IsSuspended {
+			errCount++
+			continue
+		}
+
+		stateBefore := card.State
+
+		applyFSRSCardState(card, item.Card)
+		if err := s.cardRepo.UpdateFSRS(ctx, card); err != nil {
+			errCount++
+			continue
+		}
+
+		reviewLog := &domain.ReviewLog{
+			CardID:        card.ID,
+			UserID:        userID,
+			Rating:        domain.Rating(item.Rating),
+			State:         stateBefore,
+			ScheduledDays: item.Log.ScheduledDays,
+			ElapsedDays:   item.Log.ElapsedDays,
+			Stability:     item.Log.Stability,
+			Difficulty:    item.Log.Difficulty,
+			DurationMS:    item.DurationMS,
+			Source:        domain.ReviewSourceFlashcard,
+			ReviewedAt:    item.ReviewedAt,
+		}
+		if err := s.reviewRepo.Create(ctx, reviewLog); err != nil {
+			errCount++
+			continue
+		}
+
+		switch stateBefore {
+		case domain.CardStateNew:
+			newInc++
+		case domain.CardStateReview, domain.CardStateLearning:
+			reviewInc++
+		case domain.CardStateRelearning:
+			relearnInc++
+		}
+		totalDuration += item.DurationMS
+		processed++
+	}
+
+	session.NewCount += newInc
+	session.ReviewCount += reviewInc
+	session.RelearnCount += relearnInc
+	session.TotalDurationMS += totalDuration
+	if err := s.sessionRepo.Update(ctx, session); err != nil {
+		return nil, err
+	}
+
+	return &BatchReviewResult{
+		Processed: processed,
+		Errors:    errCount,
 	}, nil
 }
 

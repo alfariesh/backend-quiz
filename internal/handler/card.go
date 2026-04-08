@@ -155,6 +155,22 @@ func (h *CardHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	JSONMessage(w, http.StatusOK, "card deleted")
 }
 
+func (h *CardHandler) ResetFSRS(w http.ResponseWriter, r *http.Request) {
+	userID, _ := middleware.GetUserID(r.Context())
+	cardID, err := uuid.Parse(chi.URLParam(r, "cardID"))
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid card id")
+		return
+	}
+
+	card, err := h.cardSvc.ResetFSRS(r.Context(), userID, cardID)
+	if err != nil {
+		HandleError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, card)
+}
+
 func (h *CardHandler) Suspend(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 	cardID, err := uuid.Parse(chi.URLParam(r, "cardID"))

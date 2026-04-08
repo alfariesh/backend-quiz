@@ -82,6 +82,32 @@ func (h *StudyHandler) SubmitReview(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, result)
 }
 
+func (h *StudyHandler) BatchReview(w http.ResponseWriter, r *http.Request) {
+	userID, _ := middleware.GetUserID(r.Context())
+	sessionID, err := uuid.Parse(chi.URLParam(r, "sessionID"))
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid session id")
+		return
+	}
+
+	var req service.BatchReviewRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := validate.Get().Struct(req); err != nil {
+		JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	result, err := h.studySvc.BatchReview(r.Context(), userID, sessionID, req)
+	if err != nil {
+		HandleError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, result)
+}
+
 func (h *StudyHandler) EndSession(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 	sessionID, err := uuid.Parse(chi.URLParam(r, "sessionID"))

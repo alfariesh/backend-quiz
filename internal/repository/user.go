@@ -62,6 +62,14 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.
 }
 
 func (r *UserRepository) Update(ctx context.Context, user *domain.User) error {
+	var weights []float32
+	if len(user.FSRSWeights) > 0 {
+		weights = make([]float32, len(user.FSRSWeights))
+		for i, w := range user.FSRSWeights {
+			weights[i] = float32(w)
+		}
+	}
+
 	result, err := r.q.UpdateUser(ctx, sqlc.UpdateUserParams{
 		ID:               user.ID,
 		DisplayName:      pgtype.Text{String: user.DisplayName, Valid: true},
@@ -69,6 +77,7 @@ func (r *UserRepository) Update(ctx context.Context, user *domain.User) error {
 		DesiredRetention: pgtype.Float4{Float32: float32(user.DesiredRetention), Valid: true},
 		DailyNewLimit:    pgtype.Int4{Int32: int32(user.DailyNewLimit), Valid: true},
 		DailyReviewLimit: pgtype.Int4{Int32: int32(user.DailyReviewLimit), Valid: true},
+		FsrsWeights:      weights,
 	})
 	if err != nil {
 		return err

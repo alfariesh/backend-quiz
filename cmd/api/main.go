@@ -165,6 +165,7 @@ func run() error {
 				r.Put("/", cardH.Update)
 				r.Delete("/", cardH.Delete)
 				r.Put("/suspend", cardH.Suspend)
+				r.Put("/reset", cardH.ResetFSRS)
 
 				// Media
 				r.Post("/media", mediaH.Upload)
@@ -179,6 +180,7 @@ func run() error {
 				r.Post("/sessions", studyH.StartSession)
 				r.Get("/sessions/{sessionID}", studyH.GetSession)
 				r.Post("/sessions/{sessionID}/review", studyH.SubmitReview)
+				r.Post("/sessions/{sessionID}/reviews/batch", studyH.BatchReview)
 				r.Put("/sessions/{sessionID}/end", studyH.EndSession)
 			})
 

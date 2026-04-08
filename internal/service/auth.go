@@ -46,11 +46,12 @@ type LoginRequest struct {
 }
 
 type UpdateProfileRequest struct {
-	DisplayName      *string  `json:"display_name,omitempty" validate:"omitempty,min=1,max=100"`
-	Timezone         *string  `json:"timezone,omitempty"`
-	DesiredRetention *float64 `json:"desired_retention,omitempty" validate:"omitempty,min=0.7,max=0.97"`
-	DailyNewLimit    *int     `json:"daily_new_limit,omitempty" validate:"omitempty,min=0,max=9999"`
-	DailyReviewLimit *int     `json:"daily_review_limit,omitempty" validate:"omitempty,min=0,max=9999"`
+	DisplayName      *string   `json:"display_name,omitempty" validate:"omitempty,min=1,max=100"`
+	Timezone         *string   `json:"timezone,omitempty"`
+	DesiredRetention *float64  `json:"desired_retention,omitempty" validate:"omitempty,min=0.7,max=0.97"`
+	DailyNewLimit    *int      `json:"daily_new_limit,omitempty" validate:"omitempty,min=0,max=9999"`
+	DailyReviewLimit *int      `json:"daily_review_limit,omitempty" validate:"omitempty,min=0,max=9999"`
+	FSRSWeights      []float64 `json:"fsrs_weights,omitempty" validate:"omitempty,len=19"`
 }
 
 func (s *AuthService) Register(ctx context.Context, req RegisterRequest) (*TokenPair, *domain.User, error) {
@@ -169,6 +170,9 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uuid.UUID, req U
 	}
 	if req.DailyReviewLimit != nil {
 		user.DailyReviewLimit = *req.DailyReviewLimit
+	}
+	if req.FSRSWeights != nil {
+		user.FSRSWeights = req.FSRSWeights
 	}
 
 	if err := s.userRepo.Update(ctx, user); err != nil {

@@ -174,6 +174,27 @@ func (s *CardService) Delete(ctx context.Context, userID, cardID uuid.UUID) erro
 	return s.cardRepo.Delete(ctx, cardID)
 }
 
+func (s *CardService) ResetFSRS(ctx context.Context, userID, cardID uuid.UUID) (*domain.Card, error) {
+	card, err := s.cardRepo.GetByID(ctx, cardID)
+	if err != nil {
+		return nil, err
+	}
+
+	deck, err := s.deckRepo.GetByID(ctx, card.DeckID)
+	if err != nil {
+		return nil, err
+	}
+	if deck.UserID != userID {
+		return nil, domain.ErrForbidden
+	}
+
+	if err := s.cardRepo.ResetFSRS(ctx, cardID); err != nil {
+		return nil, err
+	}
+
+	return s.cardRepo.GetByID(ctx, cardID)
+}
+
 func (s *CardService) Suspend(ctx context.Context, userID, cardID uuid.UUID, suspended bool) error {
 	card, err := s.cardRepo.GetByID(ctx, cardID)
 	if err != nil {

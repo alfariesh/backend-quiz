@@ -1,0 +1,278 @@
+package service
+
+import (
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/rekanesiads/backend-quiz/internal/domain"
+)
+
+// --- validateFSRSState ---
+
+func TestValidateFSRSState_Valid(t *testing.T) {
+	state := FSRSCardState{
+		Due:           time.Now().Add(24 * time.Hour),
+		Stability:     5.0,
+		Difficulty:    3.5,
+		ElapsedDays:   1,
+		ScheduledDays: 3,
+		Reps:          2,
+		Lapses:        0,
+		State:         1,
+		LastReview:    time.Now(),
+	}
+	assert.NoError(t, validateFSRSState(state))
+}
+
+func TestValidateFSRSState_InvalidState(t *testing.T) {
+	tests := []struct {
+		name  string
+		state int
+	}{
+		{"negative state", -1},
+		{"state too high", 4},
+		{"state way too high", 99},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state := FSRSCardState{
+				Due:        time.Now().Add(time.Hour),
+				Stability:  1.0,
+				Difficulty: 5.0,
+				State:      tt.state,
+				LastReview: time.Now(),
+			}
+			err := validateFSRSState(state)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, domain.ErrInvalidInput)
+			assert.Contains(t, err.Error(), "invalid card state")
+		})
+	}
+}
+
+func TestValidateFSRSState_NegativeStability(t *testing.T) {
+	state := FSRSCardState{
+		Due:        time.Now().Add(time.Hour),
+		Stability:  -0.1,
+		Difficulty: 5.0,
+		State:      0,
+		LastReview: time.Now(),
+	}
+	err := validateFSRSState(state)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	assert.Contains(t, err.Error(), "stability")
+}
+
+func TestValidateFSRSState_InvalidDifficulty(t *testing.T) {
+	tests := []struct {
+		name       string
+		difficulty float64
+	}{
+		{"negative", -1.0},
+		{"too high", 10.1},
+		{"way too high", 50.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state := FSRSCardState{
+				Due:        time.Now().Add(time.Hour),
+				Stability:  1.0,
+				Difficulty: tt.difficulty,
+				State:      0,
+				LastReview: time.Now(),
+			}
+			err := validateFSRSState(state)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, domain.ErrInvalidInput)
+			assert.Contains(t, err.Error(), "difficulty")
+		})
+	}
+}
+
+func TestValidateFSRSState_DueTooFarInFuture(t *testing.T) {
+	state := FSRSCardState{
+		Due:        time.Now().AddDate(0, 0, 36501),
+		Stability:  1.0,
+		Difficulty: 5.0,
+		State:      0,
+		LastReview: time.Now(),
+	}
+	err := validateFSRSState(state)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	assert.Contains(t, err.Error(), "due date too far")
+}
+
+func TestValidateFSRSState_BoundaryValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		state FSRSCardState
+	}{
+		{
+			"state 0 (new)",
+			FSRSCardState{Due: time.Now(), Stability: 0, Difficulty: 0, State: 0, LastReview: time.Now()},
+		},
+		{
+			"state 3 (relearning)",
+			FSRSCardState{Due: time.Now(), Stability: 0, Difficulty: 10, State: 3, LastReview: time.Now()},
+		},
+		{
+			"max difficulty 10",
+			FSRSCardState{Due: time.Now(), Stability: 100, Difficulty: 10.0, State: 2, LastReview: time.Now()},
+		},
+		{
+			"zero stability",
+			FSRSCardState{Due: time.Now(), Stability: 0, Difficulty: 5.0, State: 0, LastReview: time.Now()},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.NoError(t, validateFSRSState(tt.state))
+		})
+	}
+}
+
+// --- applyFSRSCardState ---
+
+func TestApplyFSRSCardState(t *testing.T) {
+	card := &domain.Card{
+		ID:     uuid.New(),
+		DeckID: uuid.New(),
+		Front:  "test front",
+		Back:   "test back",
+	}
+
+	now := time.Now()
+	lastReview := now.Add(-24 * time.Hour)
+	dueDate := now.Add(72 * time.Hour)
+
+	state := FSRSCardState{
+		Due:           dueDate,
+		Stability:     12.5,
+		Difficulty:    4.2,
+		ElapsedDays:   7,
+		ScheduledDays: 14,
+		Reps:          5,
+		Lapses:        1,
+		State:         2,
+		LastReview:    lastReview,
+	}
+
+	applyFSRSCardState(card, state)
+
+	assert.Equal(t, dueDate, card.Due)
+	assert.Equal(t, 12.5, card.Stability)
+	assert.Equal(t, 4.2, card.Difficulty)
+	assert.Equal(t, 7, card.ElapsedDays)
+	assert.Equal(t, 14, card.ScheduledDays)
+	assert.Equal(t, 5, card.Reps)
+	assert.Equal(t, 1, card.Lapses)
+	assert.Equal(t, domain.CardStateReview, card.State)
+	require.NotNil(t, card.LastReview)
+	assert.Equal(t, lastReview, *card.LastReview)
+}
+
+func TestApplyFSRSCardState_PreservesNonFSRSFields(t *testing.T) {
+	deckID := uuid.New()
+	cardID := uuid.New()
+	card := &domain.Card{
+		ID:          cardID,
+		DeckID:      deckID,
+		Front:       "original front",
+		Back:        "original back",
+		ContentType: "markdown",
+		Tags:        []string{"tag1"},
+		IsSuspended: false,
+		Position:    3,
+	}
+
+	state := FSRSCardState{
+		Due:        time.Now(),
+		Stability:  1.0,
+		Difficulty: 5.0,
+		State:      1,
+		LastReview: time.Now(),
+	}
+
+	applyFSRSCardState(card, state)
+
+	assert.Equal(t, cardID, card.ID)
+	assert.Equal(t, deckID, card.DeckID)
+	assert.Equal(t, "original front", card.Front)
+	assert.Equal(t, "original back", card.Back)
+	assert.Equal(t, "markdown", card.ContentType)
+	assert.Equal(t, []string{"tag1"}, card.Tags)
+	assert.False(t, card.IsSuspended)
+	assert.Equal(t, 3, card.Position)
+}
+
+// --- countCards ---
+
+func TestCountCards_Empty(t *testing.T) {
+	svc := &StudyService{}
+	counts := svc.countCards(nil)
+
+	assert.Equal(t, 0, counts.New)
+	assert.Equal(t, 0, counts.Learning)
+	assert.Equal(t, 0, counts.Review)
+	assert.Equal(t, 0, counts.Total)
+}
+
+func TestCountCards_Mixed(t *testing.T) {
+	svc := &StudyService{}
+	cards := []domain.Card{
+		{State: domain.CardStateNew},
+		{State: domain.CardStateNew},
+		{State: domain.CardStateLearning},
+		{State: domain.CardStateReview},
+		{State: domain.CardStateReview},
+		{State: domain.CardStateReview},
+		{State: domain.CardStateRelearning},
+	}
+
+	counts := svc.countCards(cards)
+
+	assert.Equal(t, 2, counts.New)
+	assert.Equal(t, 2, counts.Learning) // learning + relearning
+	assert.Equal(t, 3, counts.Review)
+	assert.Equal(t, 7, counts.Total)
+}
+
+func TestCountCards_AllNew(t *testing.T) {
+	svc := &StudyService{}
+	cards := []domain.Card{
+		{State: domain.CardStateNew},
+		{State: domain.CardStateNew},
+		{State: domain.CardStateNew},
+	}
+
+	counts := svc.countCards(cards)
+
+	assert.Equal(t, 3, counts.New)
+	assert.Equal(t, 0, counts.Learning)
+	assert.Equal(t, 0, counts.Review)
+	assert.Equal(t, 3, counts.Total)
+}
+
+func TestCountCards_AllReview(t *testing.T) {
+	svc := &StudyService{}
+	cards := []domain.Card{
+		{State: domain.CardStateReview},
+		{State: domain.CardStateReview},
+	}
+
+	counts := svc.countCards(cards)
+
+	assert.Equal(t, 0, counts.New)
+	assert.Equal(t, 0, counts.Learning)
+	assert.Equal(t, 2, counts.Review)
+	assert.Equal(t, 2, counts.Total)
+}
