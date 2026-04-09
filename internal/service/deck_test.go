@@ -36,7 +36,50 @@ func TestDeckService_Create_Success(t *testing.T) {
 	assert.Equal(t, userID, deck.UserID)
 }
 
+func TestDeckService_Create_RepoError(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	deckRepo.On("Create", ctx, mock.AnythingOfType("*domain.Deck")).Return(domain.ErrDeckNameTaken)
+
+	_, err := svc.Create(ctx, uuid.New(), CreateDeckRequest{Name: "Dup", Description: "test"})
+	assert.ErrorIs(t, err, domain.ErrDeckNameTaken)
+}
+
+func TestDeckService_Create_WithNewCardsPerDay(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	deckRepo.On("Create", ctx, mock.AnythingOfType("*domain.Deck")).Return(nil)
+
+	limit := 50
+	deck, err := svc.Create(ctx, uuid.New(), CreateDeckRequest{
+		Name:           "My Deck",
+		NewCardsPerDay: &limit,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, &limit, deck.NewCardsPerDay)
+}
+
 // --- Get ---
+
+func TestDeckService_Get_NotFound(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	deckRepo.On("GetByID", ctx, deckID).Return(nil, domain.ErrNotFound)
+
+	_, err := svc.Get(ctx, uuid.New(), deckID)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
 
 func TestDeckService_Get_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
@@ -119,6 +162,45 @@ func TestDeckService_Update_Success(t *testing.T) {
 	assert.Equal(t, "New Name", result.Name)
 	assert.Equal(t, "New Description", result.Description)
 	assert.True(t, result.IsArchived)
+}
+
+func TestDeckService_Update_AllFields(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	deck := &domain.Deck{ID: deckID, UserID: userID, Name: "Old", Position: 0}
+
+	deckRepo.On("GetByID", ctx, deckID).Return(deck, nil)
+	deckRepo.On("Update", ctx, mock.AnythingOfType("*domain.Deck")).Return(nil)
+
+	newCards := 30
+	pos := 5
+	result, err := svc.Update(ctx, userID, deckID, UpdateDeckRequest{
+		NewCardsPerDay: &newCards,
+		Position:       &pos,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, &newCards, result.NewCardsPerDay)
+	assert.Equal(t, 5, result.Position)
+}
+
+func TestDeckService_Update_NotFound(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	deckRepo.On("GetByID", ctx, deckID).Return(nil, domain.ErrNotFound)
+
+	name := "test"
+	_, err := svc.Update(ctx, uuid.New(), deckID, UpdateDeckRequest{Name: &name})
+	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
 func TestDeckService_Update_Forbidden(t *testing.T) {
@@ -210,6 +292,34 @@ func TestDeckService_Share_Forbidden(t *testing.T) {
 }
 
 // --- Unshare ---
+
+func TestDeckService_Unshare_Forbidden(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	deck := &domain.Deck{ID: deckID, UserID: uuid.New()}
+
+	deckRepo.On("GetByID", ctx, deckID).Return(deck, nil)
+
+	err := svc.Unshare(ctx, uuid.New(), deckID)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestDeckService_Unshare_DeckNotFound(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	deckRepo.On("GetByID", ctx, deckID).Return(nil, domain.ErrNotFound)
+
+	err := svc.Unshare(ctx, uuid.New(), deckID)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
 
 func TestDeckService_Unshare_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)

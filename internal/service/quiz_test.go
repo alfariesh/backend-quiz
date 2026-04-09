@@ -1970,3 +1970,712 @@ func TestGenerateOrdering_NonConsecutive(t *testing.T) {
 	q := svc.generateOrdering(rng, groups)
 	assert.Nil(t, q) // no run of >= 3 consecutive
 }
+
+// ============================================================
+// Additional error-path & branch-coverage tests
+// ============================================================
+
+// --- UpdateQuiz: all field branches ---
+
+func TestQuizService_UpdateQuiz_AllFields(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+	quiz := &domain.Quiz{ID: quizID, UserID: userID, Title: "Old", QuizType: "mcq", Description: "old desc"}
+
+	quizRepo.On("GetByID", ctx, quizID).Return(quiz, nil)
+	quizRepo.On("Update", ctx, mock.AnythingOfType("*domain.Quiz")).Return(nil)
+
+	newTitle := "New Title"
+	newDesc := "New Desc"
+	newType := "mixed"
+	newShuffle := false
+	newPublished := true
+	timeLimit := 300
+	result, err := svc.UpdateQuiz(ctx, userID, quizID, UpdateQuizRequest{
+		Title:            &newTitle,
+		Description:      &newDesc,
+		QuizType:         &newType,
+		ShuffleQuestions: &newShuffle,
+		IsPublished:      &newPublished,
+		TimeLimitSeconds: &timeLimit,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "New Title", result.Title)
+	assert.Equal(t, "New Desc", result.Description)
+	assert.Equal(t, "mixed", result.QuizType)
+	assert.False(t, result.ShuffleQuestions)
+	assert.True(t, result.IsPublished)
+	assert.Equal(t, 300, *result.TimeLimitSeconds)
+}
+
+func TestQuizService_UpdateQuiz_NotFound(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	quizID := uuid.New()
+	quizRepo.On("GetByID", ctx, quizID).Return(nil, domain.ErrNotFound)
+
+	title := "X"
+	_, err := svc.UpdateQuiz(ctx, uuid.New(), quizID, UpdateQuizRequest{Title: &title})
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// --- UpdateQuestion: all field branches ---
+
+func TestQuizService_UpdateQuestion_AllFields(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+	questionID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
+	quizRepo.On("GetQuestionByID", ctx, questionID).Return(&domain.QuizQuestion{
+		ID: questionID, QuizID: quizID, QuestionType: domain.QuestionTypeFillBlank,
+		QuestionText: "Old", CorrectAnswer: "Old", Explanation: "old", Points: 1,
+	}, nil)
+	quizRepo.On("UpdateQuestion", ctx, mock.AnythingOfType("*domain.QuizQuestion")).Return(nil)
+
+	newType := domain.QuestionTypeTrueFalse
+	newText := "Is this true?"
+	newAnswer := "true"
+	newExplanation := "Because yes"
+	newPoints := 5
+	opts := json.RawMessage(`null`)
+
+	q, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, UpdateQuestionRequest{
+		QuestionType:  &newType,
+		QuestionText:  &newText,
+		Options:       &opts,
+		CorrectAnswer: &newAnswer,
+		Explanation:   &newExplanation,
+		Points:        &newPoints,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.QuestionTypeTrueFalse, q.QuestionType)
+	assert.Equal(t, "Is this true?", q.QuestionText)
+	assert.Equal(t, "true", q.CorrectAnswer)
+	assert.Equal(t, "Because yes", q.Explanation)
+	assert.Equal(t, 5, q.Points)
+}
+
+// --- GetQuiz: ListQuestions error ---
+
+func TestQuizService_GetQuiz_ListQuestionsError(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
+	quizRepo.On("ListQuestionsByQuizID", ctx, quizID).Return(nil, assert.AnError)
+
+	_, err := svc.GetQuiz(ctx, userID, quizID)
+	assert.Error(t, err)
+}
+
+func TestQuizService_GetQuiz_NotFound(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	quizID := uuid.New()
+	quizRepo.On("GetByID", ctx, quizID).Return(nil, domain.ErrNotFound)
+
+	_, err := svc.GetQuiz(ctx, uuid.New(), quizID)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// --- CreateQuiz: deck error ---
+
+func TestQuizService_CreateQuiz_DeckNotFound(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	deckRepo.On("GetByID", ctx, deckID).Return(nil, domain.ErrNotFound)
+
+	_, err := svc.CreateQuiz(ctx, uuid.New(), CreateQuizRequest{
+		DeckID: &deckID, Title: "X", QuizType: "mcq",
+	})
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// --- DeleteQuiz: not found ---
+
+func TestQuizService_DeleteQuiz_NotFound(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	quizID := uuid.New()
+	quizRepo.On("GetByID", ctx, quizID).Return(nil, domain.ErrNotFound)
+
+	err := svc.DeleteQuiz(ctx, uuid.New(), quizID)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// --- BatchAddQuestions: CountQuestions error ---
+
+func TestQuizService_BatchAddQuestions_CountError(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
+	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, assert.AnError)
+
+	_, err := svc.BatchAddQuestions(ctx, userID, quizID, BatchAddQuestionsRequest{
+		Questions: []AddQuestionRequest{
+			{QuestionType: domain.QuestionTypeFillBlank, QuestionText: "Q", CorrectAnswer: "A"},
+		},
+	})
+	assert.Error(t, err)
+}
+
+// --- GenerateFromDeck: Mixed type ---
+
+func TestQuizService_GenerateFromDeck_MixedType(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
+	deckRepo.On("GetByID", ctx, deckID).Return(&domain.Deck{ID: deckID, UserID: userID}, nil)
+
+	cards := []domain.Card{
+		{ID: uuid.New(), Front: "Q1", Back: "A1"},
+		{ID: uuid.New(), Front: "Q2", Back: "A2"},
+		{ID: uuid.New(), Front: "Q3", Back: "A3"},
+		{ID: uuid.New(), Front: "Q4", Back: "A4"},
+		{ID: uuid.New(), Front: "Q5", Back: "A5"},
+	}
+	cardRepo.On("ListByDeckID", ctx, deckID, domain.CardFilter{}, 10000, 0).Return(cards, 5, nil)
+	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
+	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
+
+	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+		DeckID:       deckID,
+		QuestionType: domain.QuizTypeMixed,
+		Count:        3,
+	})
+
+	require.NoError(t, err)
+	assert.Len(t, questions, 3)
+	for _, q := range questions {
+		assert.Contains(t, []string{domain.QuestionTypeMCQ, domain.QuestionTypeTrueFalse, domain.QuestionTypeFillBlank}, q.QuestionType)
+	}
+}
+
+func TestQuizService_GenerateFromDeck_TrueFalseType(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
+	deckRepo.On("GetByID", ctx, deckID).Return(&domain.Deck{ID: deckID, UserID: userID}, nil)
+
+	cards := []domain.Card{
+		{ID: uuid.New(), Front: "Q1", Back: "A1"},
+		{ID: uuid.New(), Front: "Q2", Back: "A2"},
+		{ID: uuid.New(), Front: "Q3", Back: "A3"},
+	}
+	cardRepo.On("ListByDeckID", ctx, deckID, domain.CardFilter{}, 10000, 0).Return(cards, 3, nil)
+	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
+	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
+
+	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+		DeckID:       deckID,
+		QuestionType: domain.QuestionTypeTrueFalse,
+		Count:        2,
+	})
+
+	require.NoError(t, err)
+	assert.Len(t, questions, 2)
+	for _, q := range questions {
+		assert.Equal(t, domain.QuestionTypeTrueFalse, q.QuestionType)
+	}
+}
+
+func TestQuizService_GenerateFromDeck_MCQType(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
+	deckRepo.On("GetByID", ctx, deckID).Return(&domain.Deck{ID: deckID, UserID: userID}, nil)
+
+	cards := []domain.Card{
+		{ID: uuid.New(), Front: "Q1", Back: "A1"},
+		{ID: uuid.New(), Front: "Q2", Back: "A2"},
+		{ID: uuid.New(), Front: "Q3", Back: "A3"},
+		{ID: uuid.New(), Front: "Q4", Back: "A4"},
+	}
+	cardRepo.On("ListByDeckID", ctx, deckID, domain.CardFilter{}, 10000, 0).Return(cards, 4, nil)
+	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
+	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
+
+	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+		DeckID:       deckID,
+		QuestionType: domain.QuestionTypeMCQ,
+		Count:        2,
+	})
+
+	require.NoError(t, err)
+	assert.Len(t, questions, 2)
+	for _, q := range questions {
+		assert.Equal(t, domain.QuestionTypeMCQ, q.QuestionType)
+	}
+}
+
+func TestQuizService_GenerateFromDeck_CountExceedsCards(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
+	deckRepo.On("GetByID", ctx, deckID).Return(&domain.Deck{ID: deckID, UserID: userID}, nil)
+
+	cards := []domain.Card{
+		{ID: uuid.New(), Front: "Q1", Back: "A1"},
+		{ID: uuid.New(), Front: "Q2", Back: "A2"},
+		{ID: uuid.New(), Front: "Q3", Back: "A3"},
+	}
+	cardRepo.On("ListByDeckID", ctx, deckID, domain.CardFilter{}, 10000, 0).Return(cards, 3, nil)
+	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
+	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
+
+	// Request 100 but only 3 cards → should generate 3
+	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+		DeckID:       deckID,
+		QuestionType: domain.QuestionTypeFillBlank,
+		Count:        100,
+	})
+
+	require.NoError(t, err)
+	assert.Len(t, questions, 3)
+}
+
+// --- GenerateAyatQuiz: mixed_ayat type ---
+
+func TestQuizService_GenerateAyatQuiz_MixedAyat(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
+	deckRepo.On("GetByID", ctx, deckID).Return(&domain.Deck{ID: deckID, UserID: userID}, nil)
+
+	cards := []domain.Card{
+		{ID: uuid.New(), Front: "بسم الله الرحمن الرحيم", Tags: []string{"surat:Al-Fatihah", "ayat:1"}},
+		{ID: uuid.New(), Front: "الحمد لله رب العالمين", Tags: []string{"surat:Al-Fatihah", "ayat:2"}},
+		{ID: uuid.New(), Front: "الرحمن الرحيم", Tags: []string{"surat:Al-Fatihah", "ayat:3"}},
+		{ID: uuid.New(), Front: "مالك يوم الدين", Tags: []string{"surat:Al-Fatihah", "ayat:4"}},
+		{ID: uuid.New(), Front: "إياك نعبد وإياك نستعين", Tags: []string{"surat:Al-Fatihah", "ayat:5"}},
+		{ID: uuid.New(), Front: "اهدنا الصراط المستقيم", Tags: []string{"surat:Al-Fatihah", "ayat:6"}},
+		{ID: uuid.New(), Front: "ألم", Tags: []string{"surat:Al-Baqarah", "ayat:1"}},
+		{ID: uuid.New(), Front: "ذلك الكتاب لا ريب فيه هدى للمتقين", Tags: []string{"surat:Al-Baqarah", "ayat:2"}},
+		{ID: uuid.New(), Front: "الذين يؤمنون بالغيب", Tags: []string{"surat:Al-Baqarah", "ayat:3"}},
+	}
+	cardRepo.On("ListByDeckID", ctx, deckID, domain.CardFilter{}, 10000, 0).Return(cards, len(cards), nil)
+	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
+	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
+
+	questions, err := svc.GenerateAyatQuiz(ctx, userID, quizID, GenerateAyatQuizRequest{
+		DeckID:       deckID,
+		QuestionType: domain.QuizTypeMixedAyat,
+		Count:        3,
+	})
+
+	require.NoError(t, err)
+	assert.NotEmpty(t, questions)
+}
+
+func TestQuizService_GenerateAyatQuiz_ContinuationType(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
+	deckRepo.On("GetByID", ctx, deckID).Return(&domain.Deck{ID: deckID, UserID: userID}, nil)
+
+	cards := []domain.Card{
+		{ID: uuid.New(), Front: "بسم الله الرحمن الرحيم", Tags: []string{"surat:Al-Fatihah", "ayat:1"}},
+		{ID: uuid.New(), Front: "الحمد لله رب العالمين", Tags: []string{"surat:Al-Fatihah", "ayat:2"}},
+		{ID: uuid.New(), Front: "الرحمن الرحيم", Tags: []string{"surat:Al-Fatihah", "ayat:3"}},
+	}
+	cardRepo.On("ListByDeckID", ctx, deckID, domain.CardFilter{}, 10000, 0).Return(cards, 3, nil)
+	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
+	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
+
+	questions, err := svc.GenerateAyatQuiz(ctx, userID, quizID, GenerateAyatQuizRequest{
+		DeckID:       deckID,
+		QuestionType: domain.QuestionTypeAyatContinuation,
+		Count:        2,
+	})
+
+	require.NoError(t, err)
+	assert.NotEmpty(t, questions)
+	for _, q := range questions {
+		assert.Equal(t, domain.QuestionTypeAyatContinuation, q.QuestionType)
+	}
+}
+
+func TestQuizService_GenerateAyatQuiz_DeckForbidden(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
+	deckRepo.On("GetByID", ctx, deckID).Return(&domain.Deck{ID: deckID, UserID: uuid.New()}, nil) // different owner
+
+	_, err := svc.GenerateAyatQuiz(ctx, userID, quizID, GenerateAyatQuizRequest{
+		DeckID: deckID, QuestionType: domain.QuestionTypeAyatCloze, Count: 1,
+	})
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestQuizService_GenerateAyatQuiz_QuizForbidden(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: uuid.New()}, nil)
+
+	_, err := svc.GenerateAyatQuiz(ctx, uuid.New(), quizID, GenerateAyatQuizRequest{
+		DeckID: deckID, QuestionType: domain.QuestionTypeAyatCloze, Count: 1,
+	})
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+// --- applyFSRSFromQuiz: suspended card ---
+
+func TestQuizService_SubmitAnswer_FSRS_SuspendedCard(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	attemptID := uuid.New()
+	quizID := uuid.New()
+	questionID := uuid.New()
+	cardID := uuid.New()
+	now := time.Now()
+
+	attemptRepo.On("GetByID", ctx, attemptID).Return(&domain.QuizAttempt{
+		ID: attemptID, QuizID: quizID, UserID: userID, StartedAt: now,
+	}, nil)
+	quizRepo.On("GetQuestionByID", ctx, questionID).Return(&domain.QuizQuestion{
+		ID: questionID, QuizID: quizID, CardID: &cardID,
+		QuestionType: domain.QuestionTypeFillBlank, CorrectAnswer: "test", Points: 1,
+	}, nil)
+	attemptRepo.On("GetAnswerByAttemptAndQuestion", ctx, attemptID, questionID).Return(nil, domain.ErrNotFound)
+	attemptRepo.On("CreateAnswer", ctx, mock.AnythingOfType("*domain.QuizAnswer")).Return(nil)
+	attemptRepo.On("Update", ctx, mock.AnythingOfType("*domain.QuizAttempt")).Return(nil)
+
+	// Card is suspended — FSRS should be skipped
+	cardRepo.On("GetByID", ctx, cardID).Return(&domain.Card{ID: cardID, IsSuspended: true}, nil)
+
+	result, err := svc.SubmitAnswer(ctx, userID, attemptID, SubmitAnswerRequest{
+		QuestionID: questionID,
+		Answer:     "test",
+		FSRSCard:   &FSRSCardState{Due: now, Stability: 2.5, Difficulty: 5.0, State: 1, LastReview: now},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, result.IsCorrect)
+	assert.False(t, result.CardUpdated) // suspended card skips FSRS
+}
+
+// --- applyFSRSFromQuiz: no rating, incorrect answer defaults to Again ---
+
+func TestQuizService_SubmitAnswer_FSRS_DefaultRatingIncorrect(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	attemptID := uuid.New()
+	quizID := uuid.New()
+	questionID := uuid.New()
+	cardID := uuid.New()
+	now := time.Now()
+
+	attemptRepo.On("GetByID", ctx, attemptID).Return(&domain.QuizAttempt{
+		ID: attemptID, QuizID: quizID, UserID: userID, StartedAt: now,
+	}, nil)
+	quizRepo.On("GetQuestionByID", ctx, questionID).Return(&domain.QuizQuestion{
+		ID: questionID, QuizID: quizID, CardID: &cardID,
+		QuestionType: domain.QuestionTypeFillBlank, CorrectAnswer: "correct", Points: 1,
+	}, nil)
+	attemptRepo.On("GetAnswerByAttemptAndQuestion", ctx, attemptID, questionID).Return(nil, domain.ErrNotFound)
+	attemptRepo.On("CreateAnswer", ctx, mock.AnythingOfType("*domain.QuizAnswer")).Return(nil)
+	attemptRepo.On("Update", ctx, mock.AnythingOfType("*domain.QuizAttempt")).Return(nil)
+
+	cardRepo.On("GetByID", ctx, cardID).Return(&domain.Card{ID: cardID, State: domain.CardStateReview}, nil)
+	cardRepo.On("UpdateFSRS", ctx, mock.AnythingOfType("*domain.Card")).Return(nil)
+	reviewRepo.On("Create", ctx, mock.AnythingOfType("*domain.ReviewLog")).Return(nil)
+
+	// No Rating provided + wrong answer → defaults to RatingAgain
+	result, err := svc.SubmitAnswer(ctx, userID, attemptID, SubmitAnswerRequest{
+		QuestionID: questionID,
+		Answer:     "wrong",
+		FSRSCard:   &FSRSCardState{Due: now, Stability: 2.5, Difficulty: 5.0, State: 2, LastReview: now},
+		// No Rating, No FSRSLog
+	})
+
+	require.NoError(t, err)
+	assert.False(t, result.IsCorrect)
+	assert.True(t, result.CardUpdated)
+}
+
+// --- StartAttempt: shuffle enabled ---
+
+func TestQuizService_StartAttempt_WithShuffle(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{
+		ID: quizID, UserID: userID, ShuffleQuestions: true,
+	}, nil)
+	quizRepo.On("ListQuestionsByQuizID", ctx, quizID).Return([]domain.QuizQuestion{
+		{ID: uuid.New(), QuizID: quizID, QuestionType: domain.QuestionTypeFillBlank, QuestionText: "Q1", CorrectAnswer: "A1", Points: 1},
+		{ID: uuid.New(), QuizID: quizID, QuestionType: domain.QuestionTypeFillBlank, QuestionText: "Q2", CorrectAnswer: "A2", Points: 1},
+		{ID: uuid.New(), QuizID: quizID, QuestionType: domain.QuestionTypeFillBlank, QuestionText: "Q3", CorrectAnswer: "A3", Points: 1},
+	}, nil)
+	attemptRepo.On("Create", ctx, mock.AnythingOfType("*domain.QuizAttempt")).Return(nil)
+
+	resp, err := svc.StartAttempt(ctx, userID, quizID)
+
+	require.NoError(t, err)
+	assert.Len(t, resp.Questions, 3)
+	assert.Equal(t, 3, resp.Attempt.TotalPoints)
+}
+
+// --- GetAttempt: ListAnswers error ---
+
+func TestQuizService_GetAttempt_ListAnswersError(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	attemptID := uuid.New()
+
+	attemptRepo.On("GetByID", ctx, attemptID).Return(&domain.QuizAttempt{
+		ID: attemptID, UserID: userID, StartedAt: time.Now(),
+	}, nil)
+	attemptRepo.On("ListAnswersByAttemptID", ctx, attemptID).Return(nil, assert.AnError)
+
+	_, err := svc.GetAttempt(ctx, userID, attemptID)
+	assert.Error(t, err)
+}
+
+// --- ListAttempts: quiz not found ---
+
+func TestQuizService_ListAttempts_QuizNotFound(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	quizID := uuid.New()
+	quizRepo.On("GetByID", ctx, quizID).Return(nil, domain.ErrNotFound)
+
+	_, _, err := svc.ListAttempts(ctx, uuid.New(), quizID, 20, 0)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// --- AddQuestion: CountQuestions error ---
+
+func TestQuizService_AddQuestion_CountError(t *testing.T) {
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	quizID := uuid.New()
+
+	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
+	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, assert.AnError)
+
+	_, err := svc.AddQuestion(ctx, userID, quizID, AddQuestionRequest{
+		QuestionType: domain.QuestionTypeFillBlank, QuestionText: "Q", CorrectAnswer: "A",
+	})
+	assert.Error(t, err)
+}
+
+// --- generateAyatCloze: short text (< 3 words) ---
+
+func TestGenerateAyatCloze_ShortText(t *testing.T) {
+	svc := &QuizService{}
+	rng := fixedRng()
+
+	ac := ayatCard{
+		Card:    domain.Card{ID: uuid.New(), Front: "كلمتين"},
+		Surat:   "Al-Fatihah",
+		AyatNum: 1,
+	}
+
+	q := svc.generateAyatCloze(rng, []ayatCard{ac})
+
+	require.NotNil(t, q)
+	assert.Equal(t, domain.QuestionTypeAyatCloze, q.QuestionType)
+	assert.Equal(t, "_____", q.QuestionText)
+	assert.Equal(t, "كلمتين", q.CorrectAnswer) // short text uses fill-blank fallback
+}
+
+func TestGenerateAyatCloze_LongText(t *testing.T) {
+	svc := &QuizService{}
+	rng := fixedRng()
+
+	ac := ayatCard{
+		Card:    domain.Card{ID: uuid.New(), Front: "بسم الله الرحمن الرحيم الحمد"},
+		Surat:   "Al-Fatihah",
+		AyatNum: 1,
+	}
+
+	q := svc.generateAyatCloze(rng, []ayatCard{ac})
+
+	require.NotNil(t, q)
+	assert.Equal(t, domain.QuestionTypeAyatCloze, q.QuestionType)
+	assert.Contains(t, q.QuestionText, "_____") // has blank
+	assert.NotEqual(t, "_____", q.QuestionText)  // not the short-text fallback
+}

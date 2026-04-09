@@ -389,6 +389,92 @@ func TestCardService_Suspend_Success(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestCardService_Update_CardNotFound(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
+	ctx := context.Background()
+
+	cardRepo.On("GetByID", ctx, testCardID).Return(nil, domain.ErrNotFound)
+
+	front := "Q"
+	_, err := svc.Update(ctx, testUserID, testCardID, UpdateCardRequest{Front: &front})
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestCardService_Update_WithTagsAndContentType(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
+	ctx := context.Background()
+
+	card := testCard(testCardID, testDeckID)
+	cardRepo.On("GetByID", ctx, testCardID).Return(card, nil)
+	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(testUserID, testDeckID), nil)
+	cardRepo.On("Update", ctx, mock.AnythingOfType("*domain.Card")).Return(nil)
+
+	ct := "markdown"
+	tags := []string{"quran", "surah"}
+	result, err := svc.Update(ctx, testUserID, testCardID, UpdateCardRequest{
+		ContentType: &ct,
+		Tags:        tags,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "markdown", result.ContentType)
+	assert.Equal(t, []string{"quran", "surah"}, result.Tags)
+}
+
+func TestCardService_Delete_CardNotFound(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
+	ctx := context.Background()
+
+	cardRepo.On("GetByID", ctx, testCardID).Return(nil, domain.ErrNotFound)
+
+	err := svc.Delete(ctx, testUserID, testCardID)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestCardService_Suspend_CardNotFound(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
+	ctx := context.Background()
+
+	cardRepo.On("GetByID", ctx, testCardID).Return(nil, domain.ErrNotFound)
+
+	err := svc.Suspend(ctx, testUserID, testCardID, true)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestCardService_List_DeckNotFound(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
+	ctx := context.Background()
+
+	deckRepo.On("GetByID", ctx, testDeckID).Return(nil, domain.ErrNotFound)
+
+	_, _, err := svc.List(ctx, testUserID, testDeckID, domain.CardFilter{}, 20, 0)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestCardService_BatchCreate_DeckNotFound(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
+	ctx := context.Background()
+
+	deckRepo.On("GetByID", ctx, testDeckID).Return(nil, domain.ErrNotFound)
+
+	_, err := svc.BatchCreate(ctx, testUserID, testDeckID, BatchCreateRequest{
+		Cards: []CreateCardRequest{{Front: "Q", Back: "A"}},
+	})
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
 func TestCardService_Suspend_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)

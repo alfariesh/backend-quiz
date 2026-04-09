@@ -373,6 +373,22 @@ func TestStudyService_GetSession_Success(t *testing.T) {
 	assert.Equal(t, session.ID, result.ID)
 }
 
+func TestStudyService_GetSession_NotFound(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo, noopUoW{})
+	ctx := context.Background()
+
+	sessionID := uuid.New()
+	sessionRepo.On("GetByID", ctx, sessionID).Return(nil, domain.ErrNotFound)
+
+	_, err := svc.GetSession(ctx, uuid.New(), sessionID)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
 func TestStudyService_GetSession_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
@@ -432,6 +448,110 @@ func TestStudyService_SubmitReview_Success(t *testing.T) {
 	assert.Equal(t, domain.CardStateNew, result.ReviewLog.State) // state before
 	assert.Equal(t, 1, session.NewCount)                         // incremented
 
+}
+
+func TestStudyService_SubmitReview_Forbidden(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo, noopUoW{})
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	session := studyTestSession(uuid.New(), &deckID)
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+
+	_, err := svc.SubmitReview(ctx, uuid.New(), session.ID, SubmitReviewRequest{CardID: uuid.New()})
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestStudyService_SubmitReview_SessionNotFound(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo, noopUoW{})
+	ctx := context.Background()
+
+	sessionID := uuid.New()
+	sessionRepo.On("GetByID", ctx, sessionID).Return(nil, domain.ErrNotFound)
+
+	_, err := svc.SubmitReview(ctx, uuid.New(), sessionID, SubmitReviewRequest{CardID: uuid.New()})
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestStudyService_SubmitReview_ReviewState(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo, noopUoW{})
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	session := studyTestSession(userID, &deckID)
+	cardID := uuid.New()
+	card := &domain.Card{ID: cardID, DeckID: deckID, State: domain.CardStateReview}
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+	cardRepo.On("GetByID", ctx, cardID).Return(card, nil)
+	cardRepo.On("UpdateFSRS", ctx, mock.AnythingOfType("*domain.Card")).Return(nil)
+	reviewRepo.On("Create", ctx, mock.AnythingOfType("*domain.ReviewLog")).Return(nil)
+	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
+
+	now := time.Now()
+	result, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{
+		CardID: cardID, Rating: 3,
+		Card: FSRSCardState{
+			Due: now.Add(24 * time.Hour), Stability: 5.0, Difficulty: 4.0,
+			State: 2, LastReview: now,
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.CardStateReview, result.ReviewLog.State)
+	assert.Equal(t, 1, session.ReviewCount)
+}
+
+func TestStudyService_SubmitReview_RelearningState(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo, noopUoW{})
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+	session := studyTestSession(userID, &deckID)
+	cardID := uuid.New()
+	card := &domain.Card{ID: cardID, DeckID: deckID, State: domain.CardStateRelearning}
+
+	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
+	cardRepo.On("GetByID", ctx, cardID).Return(card, nil)
+	cardRepo.On("UpdateFSRS", ctx, mock.AnythingOfType("*domain.Card")).Return(nil)
+	reviewRepo.On("Create", ctx, mock.AnythingOfType("*domain.ReviewLog")).Return(nil)
+	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
+
+	now := time.Now()
+	result, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{
+		CardID: cardID, Rating: 3,
+		Card: FSRSCardState{
+			Due: now.Add(24 * time.Hour), Stability: 5.0, Difficulty: 4.0,
+			State: 2, LastReview: now,
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.CardStateRelearning, result.ReviewLog.State)
+	assert.Equal(t, 1, session.RelearnCount)
 }
 
 func TestStudyService_SubmitReview_SessionEnded(t *testing.T) {

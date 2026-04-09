@@ -37,6 +37,34 @@ func TestGoalService_SetGoal_Success(t *testing.T) {
 	assert.Equal(t, userID, goal.UserID)
 }
 
+func TestGoalService_SetGoal_UpsertError(t *testing.T) {
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
+	ctx := context.Background()
+
+	goalRepo.On("Upsert", ctx, mock.AnythingOfType("*domain.StudyGoal")).Return(assert.AnError)
+
+	_, err := svc.SetGoal(ctx, uuid.New(), SetGoalRequest{
+		GoalType:    domain.GoalTypeDailyReviews,
+		TargetValue: 50,
+	})
+	assert.Error(t, err)
+}
+
+func TestGoalService_ListWithProgress_RepoError(t *testing.T) {
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
+	ctx := context.Background()
+	userID := uuid.New()
+
+	goalRepo.On("ListByUserID", ctx, userID).Return(nil, assert.AnError)
+
+	_, err := svc.ListWithProgress(ctx, userID)
+	assert.Error(t, err)
+}
+
 // --- DeleteGoal ---
 
 func TestGoalService_DeleteGoal_Success(t *testing.T) {

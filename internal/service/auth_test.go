@@ -442,6 +442,62 @@ func TestAuthService_FindOrCreateOAuthUser_ExistingEmailLinkOAuth(t *testing.T) 
 	assert.Equal(t, userID, user.ID) // linked to existing user
 }
 
+func TestAuthService_FindOrCreateOAuthUser_OAuthRepoError(t *testing.T) {
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	ctx := context.Background()
+
+	repo.On("GetOAuthAccount", ctx, "google", "g000").Return(nil, assert.AnError)
+
+	_, _, err := svc.FindOrCreateOAuthUser(ctx, "google", "g000", "test@example.com", "Test", nil)
+	assert.Error(t, err)
+}
+
+func TestAuthService_FindOrCreateOAuthUser_ExistingOAuth_UserNotFound(t *testing.T) {
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	oauth := &domain.OAuthAccount{UserID: userID, Provider: "google", ProviderID: "g111"}
+
+	repo.On("GetOAuthAccount", ctx, "google", "g111").Return(oauth, nil)
+	repo.On("GetByID", ctx, userID).Return(nil, domain.ErrNotFound)
+
+	_, _, err := svc.FindOrCreateOAuthUser(ctx, "google", "g111", "test@example.com", "Test", nil)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestAuthService_FindOrCreateOAuthUser_GetByEmailError(t *testing.T) {
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	ctx := context.Background()
+
+	repo.On("GetOAuthAccount", ctx, "google", "g222").Return(nil, domain.ErrNotFound)
+	repo.On("GetByEmail", ctx, "error@example.com").Return(nil, assert.AnError)
+
+	_, _, err := svc.FindOrCreateOAuthUser(ctx, "google", "g222", "error@example.com", "Test", nil)
+	assert.Error(t, err)
+}
+
+func TestAuthService_FindOrCreateOAuthUser_WithAvatar(t *testing.T) {
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	ctx := context.Background()
+
+	avatar := "https://example.com/avatar.jpg"
+	repo.On("GetOAuthAccount", ctx, "google", "g333").Return(nil, domain.ErrNotFound)
+	repo.On("GetByEmail", ctx, "avatar@example.com").Return(nil, domain.ErrNotFound)
+	repo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
+	repo.On("CreateOAuthAccount", ctx, mock.AnythingOfType("*domain.OAuthAccount")).Return(nil)
+
+	tokens, user, err := svc.FindOrCreateOAuthUser(ctx, "google", "g333", "avatar@example.com", "Avatar User", &avatar)
+
+	require.NoError(t, err)
+	assert.NotEmpty(t, tokens.AccessToken)
+	assert.Equal(t, "avatar@example.com", user.Email)
+}
+
 // --- generateTokens (via JWT structure validation) ---
 
 func TestAuthService_GenerateTokens_Structure(t *testing.T) {
