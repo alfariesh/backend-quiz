@@ -19,7 +19,7 @@ import (
 func TestDeckService_Create_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -41,7 +41,7 @@ func TestDeckService_Create_Success(t *testing.T) {
 func TestDeckService_Get_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -59,7 +59,7 @@ func TestDeckService_Get_Success(t *testing.T) {
 func TestDeckService_Get_Forbidden(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -76,7 +76,7 @@ func TestDeckService_Get_Forbidden(t *testing.T) {
 func TestDeckService_List_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -96,7 +96,7 @@ func TestDeckService_List_Success(t *testing.T) {
 func TestDeckService_Update_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -124,7 +124,7 @@ func TestDeckService_Update_Success(t *testing.T) {
 func TestDeckService_Update_Forbidden(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -142,7 +142,7 @@ func TestDeckService_Update_Forbidden(t *testing.T) {
 func TestDeckService_Delete_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -159,7 +159,7 @@ func TestDeckService_Delete_Success(t *testing.T) {
 func TestDeckService_Delete_Forbidden(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -176,7 +176,7 @@ func TestDeckService_Delete_Forbidden(t *testing.T) {
 func TestDeckService_Share_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -197,7 +197,7 @@ func TestDeckService_Share_Success(t *testing.T) {
 func TestDeckService_Share_Forbidden(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -214,7 +214,7 @@ func TestDeckService_Share_Forbidden(t *testing.T) {
 func TestDeckService_Unshare_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -233,7 +233,7 @@ func TestDeckService_Unshare_Success(t *testing.T) {
 func TestDeckService_Clone_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -256,7 +256,7 @@ func TestDeckService_Clone_Success(t *testing.T) {
 func TestDeckService_Clone_InvalidShareCode(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	deckRepo.On("GetShareByCode", ctx, "invalid").Return(nil, domain.ErrNotFound)
@@ -270,7 +270,7 @@ func TestDeckService_Clone_InvalidShareCode(t *testing.T) {
 func TestDeckService_ListPublic_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	decks := []domain.DeckWithCounts{{Deck: domain.Deck{Name: "Public Deck"}}}
@@ -288,7 +288,7 @@ func TestDeckService_ListPublic_Success(t *testing.T) {
 func TestDeckService_Export_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -317,7 +317,7 @@ func TestDeckService_Export_Success(t *testing.T) {
 func TestDeckService_Export_Forbidden(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -334,7 +334,7 @@ func TestDeckService_Export_Forbidden(t *testing.T) {
 func TestDeckService_Import_Success(t *testing.T) {
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	cardRepo := mockdomain.NewMockCardRepository(t)
-	svc := NewDeckService(deckRepo, cardRepo)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()

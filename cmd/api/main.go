@@ -78,11 +78,14 @@ func run() error {
 	mediaRepo := repository.NewMediaRepository(pool)
 	goalRepo := repository.NewGoalRepository(pool)
 
+	// Unit of Work
+	uow := repository.NewUnitOfWork(pool)
+
 	// Services
-	authSvc := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.RefreshDuration)
-	deckSvc := service.NewDeckService(deckRepo, cardRepo)
+	authSvc := service.NewAuthService(userRepo, uow, cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.RefreshDuration)
+	deckSvc := service.NewDeckService(deckRepo, cardRepo, uow)
 	cardSvc := service.NewCardService(cardRepo, deckRepo)
-	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
+	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo, uow)
 	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, quizAttemptRepo)
 	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo, reviewRepo)
 

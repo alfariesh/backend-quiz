@@ -18,14 +18,16 @@ var _ port.AuthServicer = (*AuthService)(nil)
 
 type AuthService struct {
 	userRepo        domain.UserRepository
+	uow             domain.UnitOfWork
 	jwtSecret       string
 	accessDuration  time.Duration
 	refreshDuration time.Duration
 }
 
-func NewAuthService(userRepo domain.UserRepository, jwtSecret string, accessDuration, refreshDuration time.Duration) *AuthService {
+func NewAuthService(userRepo domain.UserRepository, uow domain.UnitOfWork, jwtSecret string, accessDuration, refreshDuration time.Duration) *AuthService {
 	return &AuthService{
 		userRepo:        userRepo,
+		uow:             uow,
 		jwtSecret:       jwtSecret,
 		accessDuration:  accessDuration,
 		refreshDuration: refreshDuration,
@@ -193,7 +195,7 @@ func (s *AuthService) FindOrCreateOAuthUser(ctx context.Context, provider, provi
 	// Check if user with same email exists
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if errors.Is(err, domain.ErrNotFound) {
-		// Create new user
+		// Create new user + link OAuth in one transaction
 		user = &domain.User{
 			Email:            email,
 			DisplayName:      displayName,
@@ -202,22 +204,24 @@ func (s *AuthService) FindOrCreateOAuthUser(ctx context.Context, provider, provi
 			DailyNewLimit:    20,
 			DailyReviewLimit: 200,
 		}
-		if err := s.userRepo.Create(ctx, user); err != nil {
-			return nil, nil, err
-		}
 	} else if err != nil {
 		return nil, nil, err
 	}
 
-	// Link OAuth account
-	account := &domain.OAuthAccount{
-		UserID:     user.ID,
-		Provider:   provider,
-		ProviderID: providerID,
-		Email:      email,
-		AvatarURL:  avatarURL,
-	}
-	if err := s.userRepo.CreateOAuthAccount(ctx, account); err != nil {
+	if err := s.uow.Do(ctx, func(ctx context.Context) error {
+		if user.ID == uuid.Nil {
+			if err := s.userRepo.Create(ctx, user); err != nil {
+				return err
+			}
+		}
+		return s.userRepo.CreateOAuthAccount(ctx, &domain.OAuthAccount{
+			UserID:     user.ID,
+			Provider:   provider,
+			ProviderID: providerID,
+			Email:      email,
+			AvatarURL:  avatarURL,
+		})
+	}); err != nil {
 		return nil, nil, err
 	}
 

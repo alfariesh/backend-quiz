@@ -19,10 +19,11 @@ var _ port.DeckServicer = (*DeckService)(nil)
 type DeckService struct {
 	deckRepo domain.DeckRepository
 	cardRepo domain.CardRepository
+	uow      domain.UnitOfWork
 }
 
-func NewDeckService(deckRepo domain.DeckRepository, cardRepo domain.CardRepository) *DeckService {
-	return &DeckService{deckRepo: deckRepo, cardRepo: cardRepo}
+func NewDeckService(deckRepo domain.DeckRepository, cardRepo domain.CardRepository, uow domain.UnitOfWork) *DeckService {
+	return &DeckService{deckRepo: deckRepo, cardRepo: cardRepo, uow: uow}
 }
 
 type CreateDeckRequest = dto.CreateDeckRequest
@@ -187,9 +188,6 @@ func (s *DeckService) Import(ctx context.Context, userID uuid.UUID, req ImportDe
 		UserID: userID,
 		Name:   req.Name,
 	}
-	if err := s.deckRepo.Create(ctx, deck); err != nil {
-		return nil, err
-	}
 
 	cards := make([]*domain.Card, len(req.Cards))
 	for i, c := range req.Cards {
@@ -198,7 +196,6 @@ func (s *DeckService) Import(ctx context.Context, userID uuid.UUID, req ImportDe
 			tags = []string{}
 		}
 		cards[i] = &domain.Card{
-			DeckID:   deck.ID,
 			Front:    c.Front,
 			Back:     c.Back,
 			Tags:     tags,
@@ -206,8 +203,17 @@ func (s *DeckService) Import(ctx context.Context, userID uuid.UUID, req ImportDe
 		}
 	}
 
-	if err := s.cardRepo.BulkCreate(ctx, cards); err != nil {
-		return nil, fmt.Errorf("bulk creating cards: %w", err)
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		if err := s.deckRepo.Create(ctx, deck); err != nil {
+			return err
+		}
+		for _, c := range cards {
+			c.DeckID = deck.ID
+		}
+		return s.cardRepo.BulkCreate(ctx, cards)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("importing deck: %w", err)
 	}
 
 	return deck, nil

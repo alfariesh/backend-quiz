@@ -22,7 +22,7 @@ const testJWTSecret = "test-secret-key-for-testing"
 
 func TestAuthService_Register_Success(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
@@ -52,7 +52,7 @@ func TestAuthService_Register_Success(t *testing.T) {
 
 func TestAuthService_Register_EmailTaken(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	existing := &domain.User{ID: uuid.New(), Email: "test@example.com"}
@@ -69,7 +69,7 @@ func TestAuthService_Register_EmailTaken(t *testing.T) {
 
 func TestAuthService_Register_RepoError(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, assert.AnError)
@@ -88,7 +88,7 @@ func TestAuthService_Register_RepoError(t *testing.T) {
 
 func TestAuthService_Login_Success(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.MinCost)
@@ -112,7 +112,7 @@ func TestAuthService_Login_Success(t *testing.T) {
 
 func TestAuthService_Login_UserNotFound(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	repo.On("GetByEmail", ctx, "noone@example.com").Return(nil, domain.ErrNotFound)
@@ -127,7 +127,7 @@ func TestAuthService_Login_UserNotFound(t *testing.T) {
 
 func TestAuthService_Login_WrongPassword(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte("correct-password"), bcrypt.MinCost)
@@ -146,7 +146,7 @@ func TestAuthService_Login_WrongPassword(t *testing.T) {
 
 func TestAuthService_RefreshToken_Success(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -172,7 +172,7 @@ func TestAuthService_RefreshToken_Success(t *testing.T) {
 
 func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	_, err := svc.RefreshToken(ctx, "invalid-token")
@@ -181,7 +181,7 @@ func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
 
 func TestAuthService_RefreshToken_AccessTokenRejected(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	// Use access type instead of refresh
@@ -198,7 +198,7 @@ func TestAuthService_RefreshToken_AccessTokenRejected(t *testing.T) {
 
 func TestAuthService_RefreshToken_ExpiredToken(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	claims := jwt.MapClaims{
@@ -214,7 +214,7 @@ func TestAuthService_RefreshToken_ExpiredToken(t *testing.T) {
 
 func TestAuthService_RefreshToken_UserDeleted(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -235,7 +235,7 @@ func TestAuthService_RefreshToken_UserDeleted(t *testing.T) {
 
 func TestAuthService_GetProfile(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -250,7 +250,7 @@ func TestAuthService_GetProfile(t *testing.T) {
 
 func TestAuthService_GetProfile_NotFound(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -264,7 +264,7 @@ func TestAuthService_GetProfile_NotFound(t *testing.T) {
 
 func TestAuthService_UpdateProfile_AllFields(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -318,7 +318,7 @@ func TestAuthService_UpdateProfile_AllFields(t *testing.T) {
 
 func TestAuthService_UpdateProfile_PartialUpdate(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -349,7 +349,7 @@ func TestAuthService_UpdateProfile_PartialUpdate(t *testing.T) {
 
 func TestAuthService_UpdateProfile_FSRSWeightsOnly(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -374,7 +374,7 @@ func TestAuthService_UpdateProfile_FSRSWeightsOnly(t *testing.T) {
 
 func TestAuthService_UpdateProfile_UserNotFound(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -388,7 +388,7 @@ func TestAuthService_UpdateProfile_UserNotFound(t *testing.T) {
 
 func TestAuthService_FindOrCreateOAuthUser_ExistingOAuth(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -407,7 +407,7 @@ func TestAuthService_FindOrCreateOAuthUser_ExistingOAuth(t *testing.T) {
 
 func TestAuthService_FindOrCreateOAuthUser_NewUser(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	repo.On("GetOAuthAccount", ctx, "google", "g456").Return(nil, domain.ErrNotFound)
@@ -425,7 +425,7 @@ func TestAuthService_FindOrCreateOAuthUser_NewUser(t *testing.T) {
 
 func TestAuthService_FindOrCreateOAuthUser_ExistingEmailLinkOAuth(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -446,7 +446,7 @@ func TestAuthService_FindOrCreateOAuthUser_ExistingEmailLinkOAuth(t *testing.T) 
 
 func TestAuthService_GenerateTokens_Structure(t *testing.T) {
 	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
 
 	userID := uuid.New()
 	tokens, err := svc.generateTokens(userID)

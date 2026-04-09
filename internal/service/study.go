@@ -20,6 +20,7 @@ type StudyService struct {
 	sessionRepo domain.StudySessionRepository
 	userRepo    domain.UserRepository
 	statsRepo   domain.StatsRepository
+	uow         domain.UnitOfWork
 }
 
 func NewStudyService(
@@ -28,6 +29,7 @@ func NewStudyService(
 	sessionRepo domain.StudySessionRepository,
 	userRepo domain.UserRepository,
 	statsRepo domain.StatsRepository,
+	uow domain.UnitOfWork,
 ) *StudyService {
 	return &StudyService{
 		cardRepo:    cardRepo,
@@ -35,6 +37,7 @@ func NewStudyService(
 		sessionRepo: sessionRepo,
 		userRepo:    userRepo,
 		statsRepo:   statsRepo,
+		uow:         uow,
 	}
 }
 
@@ -118,13 +121,8 @@ func (s *StudyService) SubmitReview(ctx context.Context, userID uuid.UUID, sessi
 
 	// Apply client-computed FSRS state
 	applyFSRSCardState(card, req.Card)
-	if err := s.cardRepo.UpdateFSRS(ctx, card); err != nil {
-		return nil, err
-	}
 
 	now := time.Now()
-
-	// Create review log
 	reviewLog := &domain.ReviewLog{
 		CardID:        card.ID,
 		UserID:        userID,
@@ -137,9 +135,6 @@ func (s *StudyService) SubmitReview(ctx context.Context, userID uuid.UUID, sessi
 		DurationMS:    req.DurationMS,
 		Source:        domain.ReviewSourceFlashcard,
 		ReviewedAt:    now,
-	}
-	if err := s.reviewRepo.Create(ctx, reviewLog); err != nil {
-		return nil, err
 	}
 
 	// Update session counters
@@ -158,7 +153,16 @@ func (s *StudyService) SubmitReview(ctx context.Context, userID uuid.UUID, sessi
 	session.ReviewCount += reviewInc
 	session.RelearnCount += relearnInc
 	session.TotalDurationMS += req.DurationMS
-	if err := s.sessionRepo.Update(ctx, session); err != nil {
+
+	if err := s.uow.Do(ctx, func(ctx context.Context) error {
+		if err := s.cardRepo.UpdateFSRS(ctx, card); err != nil {
+			return err
+		}
+		if err := s.reviewRepo.Create(ctx, reviewLog); err != nil {
+			return err
+		}
+		return s.sessionRepo.Update(ctx, session)
+	}); err != nil {
 		return nil, err
 	}
 
