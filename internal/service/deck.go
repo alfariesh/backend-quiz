@@ -26,14 +26,7 @@ func NewDeckService(deckRepo domain.DeckRepository, cardRepo domain.CardReposito
 	return &DeckService{deckRepo: deckRepo, cardRepo: cardRepo, uow: uow}
 }
 
-type CreateDeckRequest = dto.CreateDeckRequest
-type UpdateDeckRequest = dto.UpdateDeckRequest
-type ShareDeckRequest = dto.ShareDeckRequest
-type ExportDeck = dto.ExportDeck
-type ExportCard = dto.ExportCard
-type ImportDeckRequest = dto.ImportDeckRequest
-
-func (s *DeckService) Create(ctx context.Context, userID uuid.UUID, req CreateDeckRequest) (*domain.Deck, error) {
+func (s *DeckService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateDeckRequest) (*domain.Deck, error) {
 	deck := &domain.Deck{
 		UserID:         userID,
 		Name:           req.Name,
@@ -62,7 +55,7 @@ func (s *DeckService) List(ctx context.Context, userID uuid.UUID, limit, offset 
 	return s.deckRepo.ListByUserID(ctx, userID, limit, offset)
 }
 
-func (s *DeckService) Update(ctx context.Context, userID, deckID uuid.UUID, req UpdateDeckRequest) (*domain.Deck, error) {
+func (s *DeckService) Update(ctx context.Context, userID, deckID uuid.UUID, req dto.UpdateDeckRequest) (*domain.Deck, error) {
 	deck, err := s.deckRepo.GetByID(ctx, deckID)
 	if err != nil {
 		return nil, err
@@ -104,7 +97,7 @@ func (s *DeckService) Delete(ctx context.Context, userID, deckID uuid.UUID) erro
 	return s.deckRepo.Delete(ctx, deckID)
 }
 
-func (s *DeckService) Share(ctx context.Context, userID, deckID uuid.UUID, req ShareDeckRequest) (*domain.DeckShare, error) {
+func (s *DeckService) Share(ctx context.Context, userID, deckID uuid.UUID, req dto.ShareDeckRequest) (*domain.DeckShare, error) {
 	deck, err := s.deckRepo.GetByID(ctx, deckID)
 	if err != nil {
 		return nil, err
@@ -171,19 +164,19 @@ func (s *DeckService) Export(ctx context.Context, userID, deckID uuid.UUID) ([]b
 		return nil, err
 	}
 
-	export := ExportDeck{
+	export := dto.ExportDeck{
 		Name:        deck.Name,
 		Description: deck.Description,
-		Cards:       make([]ExportCard, len(cards)),
+		Cards:       make([]dto.ExportCard, len(cards)),
 	}
 	for i, c := range cards {
-		export.Cards[i] = ExportCard{Front: c.Front, Back: c.Back, Tags: c.Tags}
+		export.Cards[i] = dto.ExportCard{Front: c.Front, Back: c.Back, Tags: c.Tags}
 	}
 
 	return json.MarshalIndent(export, "", "  ")
 }
 
-func (s *DeckService) Import(ctx context.Context, userID uuid.UUID, req ImportDeckRequest) (*domain.Deck, error) {
+func (s *DeckService) Import(ctx context.Context, userID uuid.UUID, req dto.ImportDeckRequest) (*domain.Deck, error) {
 	deck := &domain.Deck{
 		UserID: userID,
 		Name:   req.Name,

@@ -45,26 +45,9 @@ func NewQuizService(
 	}
 }
 
-// Request/Response DTOs
-
-type CreateQuizRequest = dto.CreateQuizRequest
-type UpdateQuizRequest = dto.UpdateQuizRequest
-type AddQuestionRequest = dto.AddQuestionRequest
-type UpdateQuestionRequest = dto.UpdateQuestionRequest
-type BatchAddQuestionsRequest = dto.BatchAddQuestionsRequest
-type GenerateFromDeckRequest = dto.GenerateFromDeckRequest
-type GenerateAyatQuizRequest = dto.GenerateAyatQuizRequest
-type SubmitAnswerRequest = dto.SubmitAnswerRequest
-type AnswerResult = dto.AnswerResult
-type QuizDetail = dto.QuizDetail
-type StartAttemptResponse = dto.StartAttemptResponse
-type QuestionForAttempt = dto.QuestionForAttempt
-type AttemptDetail = dto.AttemptDetail
-type QuizAnswerDetail = dto.QuizAnswerDetail
-
 // Quiz CRUD
 
-func (s *QuizService) CreateQuiz(ctx context.Context, userID uuid.UUID, req CreateQuizRequest) (*domain.Quiz, error) {
+func (s *QuizService) CreateQuiz(ctx context.Context, userID uuid.UUID, req dto.CreateQuizRequest) (*domain.Quiz, error) {
 	if req.DeckID != nil {
 		deck, err := s.deckRepo.GetByID(ctx, *req.DeckID)
 		if err != nil {
@@ -96,7 +79,7 @@ func (s *QuizService) CreateQuiz(ctx context.Context, userID uuid.UUID, req Crea
 	return quiz, nil
 }
 
-func (s *QuizService) GetQuiz(ctx context.Context, userID, quizID uuid.UUID) (*QuizDetail, error) {
+func (s *QuizService) GetQuiz(ctx context.Context, userID, quizID uuid.UUID) (*dto.QuizDetail, error) {
 	quiz, err := s.quizRepo.GetByID(ctx, quizID)
 	if err != nil {
 		return nil, err
@@ -110,14 +93,14 @@ func (s *QuizService) GetQuiz(ctx context.Context, userID, quizID uuid.UUID) (*Q
 		return nil, err
 	}
 
-	return &QuizDetail{Quiz: *quiz, Questions: questions}, nil
+	return &dto.QuizDetail{Quiz: *quiz, Questions: questions}, nil
 }
 
 func (s *QuizService) ListQuizzes(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.QuizWithCounts, int, error) {
 	return s.quizRepo.ListByUserID(ctx, userID, limit, offset)
 }
 
-func (s *QuizService) UpdateQuiz(ctx context.Context, userID, quizID uuid.UUID, req UpdateQuizRequest) (*domain.Quiz, error) {
+func (s *QuizService) UpdateQuiz(ctx context.Context, userID, quizID uuid.UUID, req dto.UpdateQuizRequest) (*domain.Quiz, error) {
 	quiz, err := s.quizRepo.GetByID(ctx, quizID)
 	if err != nil {
 		return nil, err
@@ -164,7 +147,7 @@ func (s *QuizService) DeleteQuiz(ctx context.Context, userID, quizID uuid.UUID) 
 
 // Question operations
 
-func (s *QuizService) AddQuestion(ctx context.Context, userID, quizID uuid.UUID, req AddQuestionRequest) (*domain.QuizQuestion, error) {
+func (s *QuizService) AddQuestion(ctx context.Context, userID, quizID uuid.UUID, req dto.AddQuestionRequest) (*domain.QuizQuestion, error) {
 	quiz, err := s.quizRepo.GetByID(ctx, quizID)
 	if err != nil {
 		return nil, err
@@ -205,7 +188,7 @@ func (s *QuizService) AddQuestion(ctx context.Context, userID, quizID uuid.UUID,
 	return q, nil
 }
 
-func (s *QuizService) BatchAddQuestions(ctx context.Context, userID, quizID uuid.UUID, req BatchAddQuestionsRequest) ([]*domain.QuizQuestion, error) {
+func (s *QuizService) BatchAddQuestions(ctx context.Context, userID, quizID uuid.UUID, req dto.BatchAddQuestionsRequest) ([]*domain.QuizQuestion, error) {
 	quiz, err := s.quizRepo.GetByID(ctx, quizID)
 	if err != nil {
 		return nil, err
@@ -249,7 +232,7 @@ func (s *QuizService) BatchAddQuestions(ctx context.Context, userID, quizID uuid
 	return questions, nil
 }
 
-func (s *QuizService) UpdateQuestion(ctx context.Context, userID, quizID, questionID uuid.UUID, req UpdateQuestionRequest) (*domain.QuizQuestion, error) {
+func (s *QuizService) UpdateQuestion(ctx context.Context, userID, quizID, questionID uuid.UUID, req dto.UpdateQuestionRequest) (*domain.QuizQuestion, error) {
 	quiz, err := s.quizRepo.GetByID(ctx, quizID)
 	if err != nil {
 		return nil, err
@@ -317,7 +300,7 @@ func (s *QuizService) DeleteQuestion(ctx context.Context, userID, quizID, questi
 
 // Generate questions from deck cards
 
-func (s *QuizService) GenerateFromDeck(ctx context.Context, userID, quizID uuid.UUID, req GenerateFromDeckRequest) ([]*domain.QuizQuestion, error) {
+func (s *QuizService) GenerateFromDeck(ctx context.Context, userID, quizID uuid.UUID, req dto.GenerateFromDeckRequest) ([]*domain.QuizQuestion, error) {
 	quiz, err := s.quizRepo.GetByID(ctx, quizID)
 	if err != nil {
 		return nil, err
@@ -518,7 +501,7 @@ func groupBySurat(cards []ayatCard) map[string][]ayatCard {
 	return groups
 }
 
-func (s *QuizService) GenerateAyatQuiz(ctx context.Context, userID, quizID uuid.UUID, req GenerateAyatQuizRequest) ([]*domain.QuizQuestion, error) {
+func (s *QuizService) GenerateAyatQuiz(ctx context.Context, userID, quizID uuid.UUID, req dto.GenerateAyatQuizRequest) ([]*domain.QuizQuestion, error) {
 	quiz, err := s.quizRepo.GetByID(ctx, quizID)
 	if err != nil {
 		return nil, err
@@ -794,7 +777,7 @@ func (s *QuizService) generateOrdering(rng *rand.Rand, groups map[string][]ayatC
 
 // Attempt operations
 
-func (s *QuizService) StartAttempt(ctx context.Context, userID, quizID uuid.UUID) (*StartAttemptResponse, error) {
+func (s *QuizService) StartAttempt(ctx context.Context, userID, quizID uuid.UUID) (*dto.StartAttemptResponse, error) {
 	quiz, err := s.quizRepo.GetByID(ctx, quizID)
 	if err != nil {
 		return nil, err
@@ -831,7 +814,7 @@ func (s *QuizService) StartAttempt(ctx context.Context, userID, quizID uuid.UUID
 	}
 
 	// Strip correct answers for attempt response
-	stripped := make([]QuestionForAttempt, len(questions))
+	stripped := make([]dto.QuestionForAttempt, len(questions))
 	for i, q := range questions {
 		opts := q.Options
 		if q.QuestionType == domain.QuestionTypeMCQ && len(opts) > 0 {
@@ -849,7 +832,7 @@ func (s *QuizService) StartAttempt(ctx context.Context, userID, quizID uuid.UUID
 			}
 		}
 
-		stripped[i] = QuestionForAttempt{
+		stripped[i] = dto.QuestionForAttempt{
 			ID:           q.ID,
 			QuizID:       q.QuizID,
 			QuestionType: q.QuestionType,
@@ -860,13 +843,13 @@ func (s *QuizService) StartAttempt(ctx context.Context, userID, quizID uuid.UUID
 		}
 	}
 
-	return &StartAttemptResponse{
+	return &dto.StartAttemptResponse{
 		Attempt:   *attempt,
 		Questions: stripped,
 	}, nil
 }
 
-func (s *QuizService) SubmitAnswer(ctx context.Context, userID, attemptID uuid.UUID, req SubmitAnswerRequest) (*AnswerResult, error) {
+func (s *QuizService) SubmitAnswer(ctx context.Context, userID, attemptID uuid.UUID, req dto.SubmitAnswerRequest) (*dto.AnswerResult, error) {
 	attempt, err := s.attemptRepo.GetByID(ctx, attemptID)
 	if err != nil {
 		return nil, err
@@ -915,7 +898,7 @@ func (s *QuizService) SubmitAnswer(ctx context.Context, userID, attemptID uuid.U
 		attempt.CorrectCount++
 	}
 
-	result := &AnswerResult{
+	result := &dto.AnswerResult{
 		IsCorrect:     isCorrect,
 		Explanation:   question.Explanation,
 		CorrectAnswer: question.CorrectAnswer,
@@ -966,7 +949,7 @@ func (s *QuizService) CompleteAttempt(ctx context.Context, userID, attemptID uui
 	return attempt, nil
 }
 
-func (s *QuizService) GetAttempt(ctx context.Context, userID, attemptID uuid.UUID) (*AttemptDetail, error) {
+func (s *QuizService) GetAttempt(ctx context.Context, userID, attemptID uuid.UUID) (*dto.AttemptDetail, error) {
 	attempt, err := s.attemptRepo.GetByID(ctx, attemptID)
 	if err != nil {
 		return nil, err
@@ -980,19 +963,19 @@ func (s *QuizService) GetAttempt(ctx context.Context, userID, attemptID uuid.UUI
 		return nil, err
 	}
 
-	details := make([]QuizAnswerDetail, len(answers))
+	details := make([]dto.QuizAnswerDetail, len(answers))
 	for i, a := range answers {
 		question, err := s.quizRepo.GetQuestionByID(ctx, a.QuestionID)
 		if err != nil {
 			return nil, err
 		}
-		details[i] = QuizAnswerDetail{
+		details[i] = dto.QuizAnswerDetail{
 			QuizAnswer: a,
 			Question:   *question,
 		}
 	}
 
-	return &AttemptDetail{
+	return &dto.AttemptDetail{
 		Attempt: *attempt,
 		Answers: details,
 	}, nil
@@ -1011,7 +994,7 @@ func (s *QuizService) ListAttempts(ctx context.Context, userID, quizID uuid.UUID
 
 // FSRS integration
 
-func (s *QuizService) applyFSRSFromQuiz(ctx context.Context, userID uuid.UUID, cardID uuid.UUID, req SubmitAnswerRequest, result *AnswerResult) {
+func (s *QuizService) applyFSRSFromQuiz(ctx context.Context, userID uuid.UUID, cardID uuid.UUID, req dto.SubmitAnswerRequest, result *dto.AnswerResult) {
 	card, err := s.cardRepo.GetByID(ctx, cardID)
 	if err != nil || card.IsSuspended {
 		return
@@ -1039,7 +1022,7 @@ func (s *QuizService) applyFSRSFromQuiz(ctx context.Context, userID uuid.UUID, c
 
 	now := time.Now()
 
-	var logState FSRSLogState
+	var logState dto.FSRSLogState
 	if req.FSRSLog != nil {
 		logState = *req.FSRSLog
 	}

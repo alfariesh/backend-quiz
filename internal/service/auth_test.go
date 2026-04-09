@@ -13,6 +13,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
 )
 
@@ -28,7 +29,7 @@ func TestAuthService_Register_Success(t *testing.T) {
 	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
 	repo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
 
-	tokens, user, err := svc.Register(ctx, RegisterRequest{
+	tokens, user, err := svc.Register(ctx, dto.RegisterRequest{
 		Email:       "test@example.com",
 		Password:    "password123",
 		DisplayName: "Test User",
@@ -58,7 +59,7 @@ func TestAuthService_Register_EmailTaken(t *testing.T) {
 	existing := &domain.User{ID: uuid.New(), Email: "test@example.com"}
 	repo.On("GetByEmail", ctx, "test@example.com").Return(existing, nil)
 
-	_, _, err := svc.Register(ctx, RegisterRequest{
+	_, _, err := svc.Register(ctx, dto.RegisterRequest{
 		Email:       "test@example.com",
 		Password:    "password123",
 		DisplayName: "Test",
@@ -74,7 +75,7 @@ func TestAuthService_Register_RepoError(t *testing.T) {
 
 	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, assert.AnError)
 
-	_, _, err := svc.Register(ctx, RegisterRequest{
+	_, _, err := svc.Register(ctx, dto.RegisterRequest{
 		Email:       "test@example.com",
 		Password:    "password123",
 		DisplayName: "Test",
@@ -100,7 +101,7 @@ func TestAuthService_Login_Success(t *testing.T) {
 	}
 	repo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
 
-	tokens, returnedUser, err := svc.Login(ctx, LoginRequest{
+	tokens, returnedUser, err := svc.Login(ctx, dto.LoginRequest{
 		Email:    "test@example.com",
 		Password: "password123",
 	})
@@ -117,7 +118,7 @@ func TestAuthService_Login_UserNotFound(t *testing.T) {
 
 	repo.On("GetByEmail", ctx, "noone@example.com").Return(nil, domain.ErrNotFound)
 
-	_, _, err := svc.Login(ctx, LoginRequest{
+	_, _, err := svc.Login(ctx, dto.LoginRequest{
 		Email:    "noone@example.com",
 		Password: "password123",
 	})
@@ -134,7 +135,7 @@ func TestAuthService_Login_WrongPassword(t *testing.T) {
 	user := &domain.User{ID: uuid.New(), Email: "test@example.com", PasswordHash: string(hash)}
 	repo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
 
-	_, _, err := svc.Login(ctx, LoginRequest{
+	_, _, err := svc.Login(ctx, dto.LoginRequest{
 		Email:    "test@example.com",
 		Password: "wrong-password",
 	})
@@ -294,7 +295,7 @@ func TestAuthService_UpdateProfile_AllFields(t *testing.T) {
 	reminderEnabled := true
 	reminderTime := "08:00"
 
-	result, err := svc.UpdateProfile(ctx, userID, UpdateProfileRequest{
+	result, err := svc.UpdateProfile(ctx, userID, dto.UpdateProfileRequest{
 		DisplayName:      &name,
 		Timezone:         &tz,
 		DesiredRetention: &ret,
@@ -335,7 +336,7 @@ func TestAuthService_UpdateProfile_PartialUpdate(t *testing.T) {
 	repo.On("Update", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
 
 	name := "Updated"
-	result, err := svc.UpdateProfile(ctx, userID, UpdateProfileRequest{
+	result, err := svc.UpdateProfile(ctx, userID, dto.UpdateProfileRequest{
 		DisplayName: &name,
 	})
 
@@ -362,7 +363,7 @@ func TestAuthService_UpdateProfile_FSRSWeightsOnly(t *testing.T) {
 	weights[0] = 0.4
 	weights[1] = 0.6
 
-	result, err := svc.UpdateProfile(ctx, userID, UpdateProfileRequest{
+	result, err := svc.UpdateProfile(ctx, userID, dto.UpdateProfileRequest{
 		FSRSWeights: weights,
 	})
 
@@ -380,7 +381,7 @@ func TestAuthService_UpdateProfile_UserNotFound(t *testing.T) {
 	userID := uuid.New()
 	repo.On("GetByID", ctx, userID).Return(nil, domain.ErrNotFound)
 
-	_, err := svc.UpdateProfile(ctx, userID, UpdateProfileRequest{})
+	_, err := svc.UpdateProfile(ctx, userID, dto.UpdateProfileRequest{})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
@@ -542,7 +543,7 @@ func TestAuthService_Register_GetByEmailRepoError(t *testing.T) {
 
 	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, assert.AnError)
 
-	_, _, err := svc.Register(ctx, RegisterRequest{
+	_, _, err := svc.Register(ctx, dto.RegisterRequest{
 		Email: "test@example.com", Password: "password123", DisplayName: "Test",
 	})
 	assert.Error(t, err)
@@ -557,7 +558,7 @@ func TestAuthService_Register_CreateError(t *testing.T) {
 	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
 	repo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(assert.AnError)
 
-	_, _, err := svc.Register(ctx, RegisterRequest{
+	_, _, err := svc.Register(ctx, dto.RegisterRequest{
 		Email: "test@example.com", Password: "password123", DisplayName: "Test",
 	})
 	assert.Error(t, err)
@@ -572,7 +573,7 @@ func TestAuthService_Login_RepoError(t *testing.T) {
 
 	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, assert.AnError)
 
-	_, _, err := svc.Login(ctx, LoginRequest{
+	_, _, err := svc.Login(ctx, dto.LoginRequest{
 		Email: "test@example.com", Password: "password123",
 	})
 	assert.Error(t, err)

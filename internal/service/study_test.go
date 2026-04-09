@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
 )
 
@@ -18,7 +19,7 @@ import (
 // --- validateFSRSState ---
 
 func TestValidateFSRSState_Valid(t *testing.T) {
-	state := FSRSCardState{
+	state := dto.FSRSCardState{
 		Due:           time.Now().Add(24 * time.Hour),
 		Stability:     5.0,
 		Difficulty:    3.5,
@@ -44,7 +45,7 @@ func TestValidateFSRSState_InvalidState(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := FSRSCardState{
+			state := dto.FSRSCardState{
 				Due:        time.Now().Add(time.Hour),
 				Stability:  1.0,
 				Difficulty: 5.0,
@@ -60,7 +61,7 @@ func TestValidateFSRSState_InvalidState(t *testing.T) {
 }
 
 func TestValidateFSRSState_NegativeStability(t *testing.T) {
-	state := FSRSCardState{
+	state := dto.FSRSCardState{
 		Due:        time.Now().Add(time.Hour),
 		Stability:  -0.1,
 		Difficulty: 5.0,
@@ -85,7 +86,7 @@ func TestValidateFSRSState_InvalidDifficulty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := FSRSCardState{
+			state := dto.FSRSCardState{
 				Due:        time.Now().Add(time.Hour),
 				Stability:  1.0,
 				Difficulty: tt.difficulty,
@@ -101,7 +102,7 @@ func TestValidateFSRSState_InvalidDifficulty(t *testing.T) {
 }
 
 func TestValidateFSRSState_DueTooFarInFuture(t *testing.T) {
-	state := FSRSCardState{
+	state := dto.FSRSCardState{
 		Due:        time.Now().AddDate(0, 0, 36501),
 		Stability:  1.0,
 		Difficulty: 5.0,
@@ -117,23 +118,23 @@ func TestValidateFSRSState_DueTooFarInFuture(t *testing.T) {
 func TestValidateFSRSState_BoundaryValues(t *testing.T) {
 	tests := []struct {
 		name  string
-		state FSRSCardState
+		state dto.FSRSCardState
 	}{
 		{
 			"state 0 (new)",
-			FSRSCardState{Due: time.Now(), Stability: 0, Difficulty: 0, State: 0, LastReview: time.Now()},
+			dto.FSRSCardState{Due: time.Now(), Stability: 0, Difficulty: 0, State: 0, LastReview: time.Now()},
 		},
 		{
 			"state 3 (relearning)",
-			FSRSCardState{Due: time.Now(), Stability: 0, Difficulty: 10, State: 3, LastReview: time.Now()},
+			dto.FSRSCardState{Due: time.Now(), Stability: 0, Difficulty: 10, State: 3, LastReview: time.Now()},
 		},
 		{
 			"max difficulty 10",
-			FSRSCardState{Due: time.Now(), Stability: 100, Difficulty: 10.0, State: 2, LastReview: time.Now()},
+			dto.FSRSCardState{Due: time.Now(), Stability: 100, Difficulty: 10.0, State: 2, LastReview: time.Now()},
 		},
 		{
 			"zero stability",
-			FSRSCardState{Due: time.Now(), Stability: 0, Difficulty: 5.0, State: 0, LastReview: time.Now()},
+			dto.FSRSCardState{Due: time.Now(), Stability: 0, Difficulty: 5.0, State: 0, LastReview: time.Now()},
 		},
 	}
 
@@ -158,7 +159,7 @@ func TestApplyFSRSCardState(t *testing.T) {
 	lastReview := now.Add(-24 * time.Hour)
 	dueDate := now.Add(72 * time.Hour)
 
-	state := FSRSCardState{
+	state := dto.FSRSCardState{
 		Due:           dueDate,
 		Stability:     12.5,
 		Difficulty:    4.2,
@@ -198,7 +199,7 @@ func TestApplyFSRSCardState_PreservesNonFSRSFields(t *testing.T) {
 		Position:    3,
 	}
 
-	state := FSRSCardState{
+	state := dto.FSRSCardState{
 		Due:        time.Now(),
 		Stability:  1.0,
 		Difficulty: 5.0,
@@ -323,7 +324,7 @@ func TestStudyService_StartSession_Success(t *testing.T) {
 	}, nil)
 	sessionRepo.On("Create", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
 
-	resp, err := svc.StartSession(ctx, user.ID, StartSessionRequest{DeckID: deckID})
+	resp, err := svc.StartSession(ctx, user.ID, dto.StartSessionRequest{DeckID: deckID})
 
 	require.NoError(t, err)
 	assert.NotNil(t, resp.Session)
@@ -346,7 +347,7 @@ func TestStudyService_StartSession_UserNotFound(t *testing.T) {
 	userID := uuid.New()
 	userRepo.On("GetByID", ctx, userID).Return(nil, domain.ErrNotFound)
 
-	_, err := svc.StartSession(ctx, userID, StartSessionRequest{DeckID: uuid.New()})
+	_, err := svc.StartSession(ctx, userID, dto.StartSessionRequest{DeckID: uuid.New()})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
@@ -431,15 +432,15 @@ func TestStudyService_SubmitReview_Success(t *testing.T) {
 	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
 
 	now := time.Now()
-	result, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{
+	result, err := svc.SubmitReview(ctx, userID, session.ID, dto.SubmitReviewRequest{
 		CardID:     cardID,
 		Rating:     3,
 		DurationMS: 5000,
-		Card: FSRSCardState{
+		Card: dto.FSRSCardState{
 			Due: now.Add(24 * time.Hour), Stability: 2.5, Difficulty: 5.0,
 			State: 1, LastReview: now,
 		},
-		Log: FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.5, Difficulty: 5.0},
+		Log: dto.FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.5, Difficulty: 5.0},
 	})
 
 	require.NoError(t, err)
@@ -464,7 +465,7 @@ func TestStudyService_SubmitReview_Forbidden(t *testing.T) {
 
 	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
 
-	_, err := svc.SubmitReview(ctx, uuid.New(), session.ID, SubmitReviewRequest{CardID: uuid.New()})
+	_, err := svc.SubmitReview(ctx, uuid.New(), session.ID, dto.SubmitReviewRequest{CardID: uuid.New()})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
 
@@ -480,7 +481,7 @@ func TestStudyService_SubmitReview_SessionNotFound(t *testing.T) {
 	sessionID := uuid.New()
 	sessionRepo.On("GetByID", ctx, sessionID).Return(nil, domain.ErrNotFound)
 
-	_, err := svc.SubmitReview(ctx, uuid.New(), sessionID, SubmitReviewRequest{CardID: uuid.New()})
+	_, err := svc.SubmitReview(ctx, uuid.New(), sessionID, dto.SubmitReviewRequest{CardID: uuid.New()})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
@@ -506,9 +507,9 @@ func TestStudyService_SubmitReview_ReviewState(t *testing.T) {
 	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
 
 	now := time.Now()
-	result, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{
+	result, err := svc.SubmitReview(ctx, userID, session.ID, dto.SubmitReviewRequest{
 		CardID: cardID, Rating: 3,
-		Card: FSRSCardState{
+		Card: dto.FSRSCardState{
 			Due: now.Add(24 * time.Hour), Stability: 5.0, Difficulty: 4.0,
 			State: 2, LastReview: now,
 		},
@@ -541,9 +542,9 @@ func TestStudyService_SubmitReview_RelearningState(t *testing.T) {
 	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
 
 	now := time.Now()
-	result, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{
+	result, err := svc.SubmitReview(ctx, userID, session.ID, dto.SubmitReviewRequest{
 		CardID: cardID, Rating: 3,
-		Card: FSRSCardState{
+		Card: dto.FSRSCardState{
 			Due: now.Add(24 * time.Hour), Stability: 5.0, Difficulty: 4.0,
 			State: 2, LastReview: now,
 		},
@@ -570,7 +571,7 @@ func TestStudyService_SubmitReview_SessionEnded(t *testing.T) {
 
 	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
 
-	_, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{CardID: uuid.New()})
+	_, err := svc.SubmitReview(ctx, userID, session.ID, dto.SubmitReviewRequest{CardID: uuid.New()})
 	assert.ErrorIs(t, err, domain.ErrSessionEnded)
 }
 
@@ -592,7 +593,7 @@ func TestStudyService_SubmitReview_CardSuspended(t *testing.T) {
 	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
 	cardRepo.On("GetByID", ctx, cardID).Return(card, nil)
 
-	_, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{CardID: cardID})
+	_, err := svc.SubmitReview(ctx, userID, session.ID, dto.SubmitReviewRequest{CardID: cardID})
 	assert.ErrorIs(t, err, domain.ErrCardSuspended)
 }
 
@@ -614,9 +615,9 @@ func TestStudyService_SubmitReview_InvalidFSRS(t *testing.T) {
 	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
 	cardRepo.On("GetByID", ctx, cardID).Return(card, nil)
 
-	_, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{
+	_, err := svc.SubmitReview(ctx, userID, session.ID, dto.SubmitReviewRequest{
 		CardID: cardID, Rating: 3,
-		Card: FSRSCardState{Stability: -1}, // invalid
+		Card: dto.FSRSCardState{Stability: -1}, // invalid
 	})
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
@@ -645,13 +646,13 @@ func TestStudyService_BatchReview_Success(t *testing.T) {
 	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
 
 	now := time.Now()
-	validCard := FSRSCardState{
+	validCard := dto.FSRSCardState{
 		Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0,
 		State: 1, LastReview: now,
 	}
 
-	result, err := svc.BatchReview(ctx, userID, session.ID, BatchReviewRequest{
-		Reviews: []BatchReviewItem{
+	result, err := svc.BatchReview(ctx, userID, session.ID, dto.BatchReviewRequest{
+		Reviews: []dto.BatchReviewItem{
 			{CardID: card1ID, Rating: 3, DurationMS: 3000, ReviewedAt: now, Card: validCard},
 			{CardID: card2ID, Rating: 4, DurationMS: 2000, ReviewedAt: now, Card: validCard},
 		},
@@ -688,16 +689,16 @@ func TestStudyService_BatchReview_PartialErrors(t *testing.T) {
 	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
 
 	now := time.Now()
-	validCard := FSRSCardState{
+	validCard := dto.FSRSCardState{
 		Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0,
 		State: 1, LastReview: now,
 	}
 
-	result, err := svc.BatchReview(ctx, userID, session.ID, BatchReviewRequest{
-		Reviews: []BatchReviewItem{
+	result, err := svc.BatchReview(ctx, userID, session.ID, dto.BatchReviewRequest{
+		Reviews: []dto.BatchReviewItem{
 			{CardID: goodCardID, Rating: 3, DurationMS: 3000, ReviewedAt: now, Card: validCard},
 			{CardID: badCardID, Rating: 3, DurationMS: 2000, ReviewedAt: now, Card: validCard},
-			{CardID: uuid.New(), Rating: 3, ReviewedAt: now, Card: FSRSCardState{Stability: -1}}, // invalid FSRS
+			{CardID: uuid.New(), Rating: 3, ReviewedAt: now, Card: dto.FSRSCardState{Stability: -1}}, // invalid FSRS
 		},
 	})
 
@@ -722,8 +723,8 @@ func TestStudyService_BatchReview_SessionEnded(t *testing.T) {
 
 	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
 
-	_, err := svc.BatchReview(ctx, userID, session.ID, BatchReviewRequest{
-		Reviews: []BatchReviewItem{{}},
+	_, err := svc.BatchReview(ctx, userID, session.ID, dto.BatchReviewRequest{
+		Reviews: []dto.BatchReviewItem{{}},
 	})
 	assert.ErrorIs(t, err, domain.ErrSessionEnded)
 }
@@ -742,8 +743,8 @@ func TestStudyService_BatchReview_Forbidden(t *testing.T) {
 
 	sessionRepo.On("GetByID", ctx, session.ID).Return(session, nil)
 
-	_, err := svc.BatchReview(ctx, uuid.New(), session.ID, BatchReviewRequest{
-		Reviews: []BatchReviewItem{{}},
+	_, err := svc.BatchReview(ctx, uuid.New(), session.ID, dto.BatchReviewRequest{
+		Reviews: []dto.BatchReviewItem{{}},
 	})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
@@ -767,13 +768,13 @@ func TestStudyService_BatchReview_SkipsSuspendedCards(t *testing.T) {
 	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
 
 	now := time.Now()
-	validCard := FSRSCardState{
+	validCard := dto.FSRSCardState{
 		Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0,
 		State: 1, LastReview: now,
 	}
 
-	result, err := svc.BatchReview(ctx, userID, session.ID, BatchReviewRequest{
-		Reviews: []BatchReviewItem{
+	result, err := svc.BatchReview(ctx, userID, session.ID, dto.BatchReviewRequest{
+		Reviews: []dto.BatchReviewItem{
 			{CardID: suspendedID, Rating: 3, ReviewedAt: now, Card: validCard},
 		},
 	})
@@ -943,7 +944,7 @@ func TestStudyService_StartSession_CardError(t *testing.T) {
 	userRepo.On("GetByID", ctx, user.ID).Return(user, nil)
 	cardRepo.On("GetDueCards", ctx, deckID, mock.AnythingOfType("time.Time"), 20, 200).Return(nil, assert.AnError)
 
-	_, err := svc.StartSession(ctx, user.ID, StartSessionRequest{DeckID: deckID})
+	_, err := svc.StartSession(ctx, user.ID, dto.StartSessionRequest{DeckID: deckID})
 	assert.Error(t, err)
 }
 
@@ -963,7 +964,7 @@ func TestStudyService_StartSession_SessionCreateError(t *testing.T) {
 	cardRepo.On("GetDueCards", ctx, deckID, mock.AnythingOfType("time.Time"), 20, 200).Return([]domain.Card{}, nil)
 	sessionRepo.On("Create", ctx, mock.AnythingOfType("*domain.StudySession")).Return(assert.AnError)
 
-	_, err := svc.StartSession(ctx, user.ID, StartSessionRequest{DeckID: deckID})
+	_, err := svc.StartSession(ctx, user.ID, dto.StartSessionRequest{DeckID: deckID})
 	assert.Error(t, err)
 }
 
@@ -999,7 +1000,7 @@ func TestStudyService_BatchReview_SessionNotFound(t *testing.T) {
 	sessionID := uuid.New()
 	sessionRepo.On("GetByID", ctx, sessionID).Return(nil, domain.ErrNotFound)
 
-	_, err := svc.BatchReview(ctx, uuid.New(), sessionID, BatchReviewRequest{})
+	_, err := svc.BatchReview(ctx, uuid.New(), sessionID, dto.BatchReviewRequest{})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
@@ -1027,10 +1028,10 @@ func TestStudyService_SubmitReview_LearningState(t *testing.T) {
 	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
 
 	now := time.Now()
-	result, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{
+	result, err := svc.SubmitReview(ctx, userID, session.ID, dto.SubmitReviewRequest{
 		CardID: cardID, Rating: 3, DurationMS: 3000,
-		Card: FSRSCardState{Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0, State: 1, LastReview: now},
-		Log:  FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.0, Difficulty: 5.0},
+		Card: dto.FSRSCardState{Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0, State: 1, LastReview: now},
+		Log:  dto.FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.0, Difficulty: 5.0},
 	})
 
 	require.NoError(t, err)
@@ -1060,10 +1061,10 @@ func TestStudyService_SubmitReview_UpdateFSRSError(t *testing.T) {
 	cardRepo.On("UpdateFSRS", ctx, mock.AnythingOfType("*domain.Card")).Return(assert.AnError)
 
 	now := time.Now()
-	_, err := svc.SubmitReview(ctx, userID, session.ID, SubmitReviewRequest{
+	_, err := svc.SubmitReview(ctx, userID, session.ID, dto.SubmitReviewRequest{
 		CardID: cardID, Rating: 3, DurationMS: 3000,
-		Card: FSRSCardState{Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0, State: 1, LastReview: now},
-		Log:  FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.0, Difficulty: 5.0},
+		Card: dto.FSRSCardState{Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0, State: 1, LastReview: now},
+		Log:  dto.FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.0, Difficulty: 5.0},
 	})
 
 	assert.ErrorIs(t, err, assert.AnError)
@@ -1091,12 +1092,12 @@ func TestStudyService_BatchReview_UpdateFSRSError(t *testing.T) {
 	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
 
 	now := time.Now()
-	validCard := FSRSCardState{Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0, State: 1, LastReview: now}
+	validCard := dto.FSRSCardState{Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0, State: 1, LastReview: now}
 
-	result, err := svc.BatchReview(ctx, userID, session.ID, BatchReviewRequest{
-		Reviews: []BatchReviewItem{
+	result, err := svc.BatchReview(ctx, userID, session.ID, dto.BatchReviewRequest{
+		Reviews: []dto.BatchReviewItem{
 			{CardID: cardID, Rating: 3, DurationMS: 3000, ReviewedAt: now, Card: validCard,
-				Log: FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.0, Difficulty: 5.0}},
+				Log: dto.FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.0, Difficulty: 5.0}},
 		},
 	})
 
@@ -1128,12 +1129,12 @@ func TestStudyService_BatchReview_ReviewCreateError(t *testing.T) {
 	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
 
 	now := time.Now()
-	validCard := FSRSCardState{Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0, State: 1, LastReview: now}
+	validCard := dto.FSRSCardState{Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0, State: 1, LastReview: now}
 
-	result, err := svc.BatchReview(ctx, userID, session.ID, BatchReviewRequest{
-		Reviews: []BatchReviewItem{
+	result, err := svc.BatchReview(ctx, userID, session.ID, dto.BatchReviewRequest{
+		Reviews: []dto.BatchReviewItem{
 			{CardID: cardID, Rating: 3, DurationMS: 3000, ReviewedAt: now, Card: validCard,
-				Log: FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.0, Difficulty: 5.0}},
+				Log: dto.FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.0, Difficulty: 5.0}},
 		},
 	})
 
@@ -1165,12 +1166,12 @@ func TestStudyService_BatchReview_RelearningState(t *testing.T) {
 	sessionRepo.On("Update", ctx, mock.AnythingOfType("*domain.StudySession")).Return(nil)
 
 	now := time.Now()
-	validCard := FSRSCardState{Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0, State: 1, LastReview: now}
+	validCard := dto.FSRSCardState{Due: now.Add(24 * time.Hour), Stability: 2.0, Difficulty: 5.0, State: 1, LastReview: now}
 
-	result, err := svc.BatchReview(ctx, userID, session.ID, BatchReviewRequest{
-		Reviews: []BatchReviewItem{
+	result, err := svc.BatchReview(ctx, userID, session.ID, dto.BatchReviewRequest{
+		Reviews: []dto.BatchReviewItem{
 			{CardID: cardID, Rating: 3, DurationMS: 3000, ReviewedAt: now, Card: validCard,
-				Log: FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.0, Difficulty: 5.0}},
+				Log: dto.FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.0, Difficulty: 5.0}},
 		},
 	})
 

@@ -23,10 +23,7 @@ func NewGoalService(goalRepo domain.GoalRepository, reviewRepo domain.ReviewRepo
 	return &GoalService{goalRepo: goalRepo, reviewRepo: reviewRepo}
 }
 
-type SetGoalRequest = dto.SetGoalRequest
-type GoalProgress = dto.GoalProgress
-
-func (s *GoalService) SetGoal(ctx context.Context, userID uuid.UUID, req SetGoalRequest) (*domain.StudyGoal, error) {
+func (s *GoalService) SetGoal(ctx context.Context, userID uuid.UUID, req dto.SetGoalRequest) (*domain.StudyGoal, error) {
 	goal := &domain.StudyGoal{
 		UserID:      userID,
 		GoalType:    req.GoalType,
@@ -39,7 +36,7 @@ func (s *GoalService) SetGoal(ctx context.Context, userID uuid.UUID, req SetGoal
 	return goal, nil
 }
 
-func (s *GoalService) ListWithProgress(ctx context.Context, userID uuid.UUID) ([]GoalProgress, error) {
+func (s *GoalService) ListWithProgress(ctx context.Context, userID uuid.UUID) ([]dto.GoalProgress, error) {
 	goals, err := s.goalRepo.ListByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -50,7 +47,7 @@ func (s *GoalService) ListWithProgress(ctx context.Context, userID uuid.UUID) ([
 	tomorrow := today.Add(24 * time.Hour)
 	weekAgo := today.AddDate(0, 0, -7)
 
-	var results []GoalProgress
+	var results []dto.GoalProgress
 	for _, goal := range goals {
 		current := 0
 
@@ -96,7 +93,7 @@ func (s *GoalService) ListWithProgress(ctx context.Context, userID uuid.UUID) ([
 			percent = math.Min(math.Round(float64(current)/float64(goal.TargetValue)*10000)/100, 100)
 		}
 
-		results = append(results, GoalProgress{
+		results = append(results, dto.GoalProgress{
 			Goal:         goal,
 			CurrentValue: current,
 			Completed:    current >= goal.TargetValue,

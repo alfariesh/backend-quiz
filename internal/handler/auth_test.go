@@ -355,7 +355,3 @@ func TestAuthHandler_Login_ServiceError(t *testing.T) {
 	h.Login(rec, req)
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
-
-func userID() uuid.UUID {
-	return uuid.MustParse("11111111-1111-1111-1111-111111111111")
-}

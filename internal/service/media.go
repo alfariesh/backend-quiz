@@ -55,9 +55,7 @@ func NewMediaService(
 	}
 }
 
-type UploadMediaRequest = dto.UploadMediaRequest
-
-func (s *MediaService) Upload(ctx context.Context, userID, cardID uuid.UUID, req UploadMediaRequest) (*domain.Media, error) {
+func (s *MediaService) Upload(ctx context.Context, userID, cardID uuid.UUID, req dto.UploadMediaRequest) (*domain.Media, error) {
 	// Validate card ownership
 	card, err := s.cardRepo.GetByID(ctx, cardID)
 	if err != nil {

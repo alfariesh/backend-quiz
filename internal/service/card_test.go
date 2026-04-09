@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
 )
 
@@ -45,7 +46,7 @@ func TestCardService_Create_Success(t *testing.T) {
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(testUserID, testDeckID), nil)
 	cardRepo.On("Create", ctx, mock.AnythingOfType("*domain.Card")).Return(nil)
 
-	card, err := svc.Create(ctx, testUserID, testDeckID, CreateCardRequest{
+	card, err := svc.Create(ctx, testUserID, testDeckID, dto.CreateCardRequest{
 		Front: "What is Go?",
 		Back:  "A programming language",
 		Tags:  []string{"programming"},
@@ -67,7 +68,7 @@ func TestCardService_Create_WithContentType(t *testing.T) {
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(testUserID, testDeckID), nil)
 	cardRepo.On("Create", ctx, mock.AnythingOfType("*domain.Card")).Return(nil)
 
-	card, err := svc.Create(ctx, testUserID, testDeckID, CreateCardRequest{
+	card, err := svc.Create(ctx, testUserID, testDeckID, dto.CreateCardRequest{
 		Front:       "# Title",
 		Back:        "**bold**",
 		ContentType: "markdown",
@@ -86,7 +87,7 @@ func TestCardService_Create_NilTagsDefaultsToEmpty(t *testing.T) {
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(testUserID, testDeckID), nil)
 	cardRepo.On("Create", ctx, mock.AnythingOfType("*domain.Card")).Return(nil)
 
-	card, err := svc.Create(ctx, testUserID, testDeckID, CreateCardRequest{
+	card, err := svc.Create(ctx, testUserID, testDeckID, dto.CreateCardRequest{
 		Front: "Q", Back: "A",
 	})
 
@@ -103,7 +104,7 @@ func TestCardService_Create_Forbidden(t *testing.T) {
 	otherUser := uuid.New()
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(otherUser, testDeckID), nil)
 
-	_, err := svc.Create(ctx, testUserID, testDeckID, CreateCardRequest{Front: "Q", Back: "A"})
+	_, err := svc.Create(ctx, testUserID, testDeckID, dto.CreateCardRequest{Front: "Q", Back: "A"})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
 
@@ -115,7 +116,7 @@ func TestCardService_Create_DeckNotFound(t *testing.T) {
 
 	deckRepo.On("GetByID", ctx, testDeckID).Return(nil, domain.ErrNotFound)
 
-	_, err := svc.Create(ctx, testUserID, testDeckID, CreateCardRequest{Front: "Q", Back: "A"})
+	_, err := svc.Create(ctx, testUserID, testDeckID, dto.CreateCardRequest{Front: "Q", Back: "A"})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
@@ -130,8 +131,8 @@ func TestCardService_BatchCreate_Success(t *testing.T) {
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(testUserID, testDeckID), nil)
 	cardRepo.On("BulkCreate", ctx, mock.AnythingOfType("[]*domain.Card")).Return(nil)
 
-	cards, err := svc.BatchCreate(ctx, testUserID, testDeckID, BatchCreateRequest{
-		Cards: []CreateCardRequest{
+	cards, err := svc.BatchCreate(ctx, testUserID, testDeckID, dto.BatchCreateRequest{
+		Cards: []dto.CreateCardRequest{
 			{Front: "Q1", Back: "A1"},
 			{Front: "Q2", Back: "A2", ContentType: "markdown"},
 		},
@@ -154,8 +155,8 @@ func TestCardService_BatchCreate_Forbidden(t *testing.T) {
 	otherUser := uuid.New()
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(otherUser, testDeckID), nil)
 
-	_, err := svc.BatchCreate(ctx, testUserID, testDeckID, BatchCreateRequest{
-		Cards: []CreateCardRequest{{Front: "Q", Back: "A"}},
+	_, err := svc.BatchCreate(ctx, testUserID, testDeckID, dto.BatchCreateRequest{
+		Cards: []dto.CreateCardRequest{{Front: "Q", Back: "A"}},
 	})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
@@ -237,7 +238,7 @@ func TestCardService_Update_Success(t *testing.T) {
 
 	newFront := "Updated front"
 	newBack := "Updated back"
-	result, err := svc.Update(ctx, testUserID, testCardID, UpdateCardRequest{
+	result, err := svc.Update(ctx, testUserID, testCardID, dto.UpdateCardRequest{
 		Front: &newFront,
 		Back:  &newBack,
 	})
@@ -262,7 +263,7 @@ func TestCardService_Update_PartialUpdate(t *testing.T) {
 	cardRepo.On("Update", ctx, mock.AnythingOfType("*domain.Card")).Return(nil)
 
 	newFront := "new front"
-	result, err := svc.Update(ctx, testUserID, testCardID, UpdateCardRequest{Front: &newFront})
+	result, err := svc.Update(ctx, testUserID, testCardID, dto.UpdateCardRequest{Front: &newFront})
 
 	require.NoError(t, err)
 	assert.Equal(t, "new front", result.Front)
@@ -281,7 +282,7 @@ func TestCardService_Update_Forbidden(t *testing.T) {
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(otherUser, testDeckID), nil)
 
 	newFront := "hack"
-	_, err := svc.Update(ctx, testUserID, testCardID, UpdateCardRequest{Front: &newFront})
+	_, err := svc.Update(ctx, testUserID, testCardID, dto.UpdateCardRequest{Front: &newFront})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
 
@@ -398,7 +399,7 @@ func TestCardService_Update_CardNotFound(t *testing.T) {
 	cardRepo.On("GetByID", ctx, testCardID).Return(nil, domain.ErrNotFound)
 
 	front := "Q"
-	_, err := svc.Update(ctx, testUserID, testCardID, UpdateCardRequest{Front: &front})
+	_, err := svc.Update(ctx, testUserID, testCardID, dto.UpdateCardRequest{Front: &front})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
@@ -415,7 +416,7 @@ func TestCardService_Update_WithTagsAndContentType(t *testing.T) {
 
 	ct := "markdown"
 	tags := []string{"quran", "surah"}
-	result, err := svc.Update(ctx, testUserID, testCardID, UpdateCardRequest{
+	result, err := svc.Update(ctx, testUserID, testCardID, dto.UpdateCardRequest{
 		ContentType: &ct,
 		Tags:        tags,
 	})
@@ -469,8 +470,8 @@ func TestCardService_BatchCreate_DeckNotFound(t *testing.T) {
 
 	deckRepo.On("GetByID", ctx, testDeckID).Return(nil, domain.ErrNotFound)
 
-	_, err := svc.BatchCreate(ctx, testUserID, testDeckID, BatchCreateRequest{
-		Cards: []CreateCardRequest{{Front: "Q", Back: "A"}},
+	_, err := svc.BatchCreate(ctx, testUserID, testDeckID, dto.BatchCreateRequest{
+		Cards: []dto.CreateCardRequest{{Front: "Q", Back: "A"}},
 	})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }

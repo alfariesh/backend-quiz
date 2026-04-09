@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
 )
 
@@ -25,7 +26,7 @@ func TestGoalService_SetGoal_Success(t *testing.T) {
 
 	goalRepo.On("Upsert", ctx, mock.AnythingOfType("*domain.StudyGoal")).Return(nil)
 
-	goal, err := svc.SetGoal(ctx, userID, SetGoalRequest{
+	goal, err := svc.SetGoal(ctx, userID, dto.SetGoalRequest{
 		GoalType:    domain.GoalTypeDailyReviews,
 		TargetValue: 50,
 	})
@@ -45,7 +46,7 @@ func TestGoalService_SetGoal_UpsertError(t *testing.T) {
 
 	goalRepo.On("Upsert", ctx, mock.AnythingOfType("*domain.StudyGoal")).Return(assert.AnError)
 
-	_, err := svc.SetGoal(ctx, uuid.New(), SetGoalRequest{
+	_, err := svc.SetGoal(ctx, uuid.New(), dto.SetGoalRequest{
 		GoalType:    domain.GoalTypeDailyReviews,
 		TargetValue: 50,
 	})

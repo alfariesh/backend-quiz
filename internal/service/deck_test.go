@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
 )
 
@@ -25,7 +26,7 @@ func TestDeckService_Create_Success(t *testing.T) {
 
 	deckRepo.On("Create", ctx, mock.AnythingOfType("*domain.Deck")).Return(nil)
 
-	deck, err := svc.Create(ctx, userID, CreateDeckRequest{
+	deck, err := svc.Create(ctx, userID, dto.CreateDeckRequest{
 		Name:        "My Deck",
 		Description: "Test deck",
 	})
@@ -44,7 +45,7 @@ func TestDeckService_Create_RepoError(t *testing.T) {
 
 	deckRepo.On("Create", ctx, mock.AnythingOfType("*domain.Deck")).Return(domain.ErrDeckNameTaken)
 
-	_, err := svc.Create(ctx, uuid.New(), CreateDeckRequest{Name: "Dup", Description: "test"})
+	_, err := svc.Create(ctx, uuid.New(), dto.CreateDeckRequest{Name: "Dup", Description: "test"})
 	assert.ErrorIs(t, err, domain.ErrDeckNameTaken)
 }
 
@@ -57,7 +58,7 @@ func TestDeckService_Create_WithNewCardsPerDay(t *testing.T) {
 	deckRepo.On("Create", ctx, mock.AnythingOfType("*domain.Deck")).Return(nil)
 
 	limit := 50
-	deck, err := svc.Create(ctx, uuid.New(), CreateDeckRequest{
+	deck, err := svc.Create(ctx, uuid.New(), dto.CreateDeckRequest{
 		Name:           "My Deck",
 		NewCardsPerDay: &limit,
 	})
@@ -152,7 +153,7 @@ func TestDeckService_Update_Success(t *testing.T) {
 	newName := "New Name"
 	newDesc := "New Description"
 	archived := true
-	result, err := svc.Update(ctx, userID, deckID, UpdateDeckRequest{
+	result, err := svc.Update(ctx, userID, deckID, dto.UpdateDeckRequest{
 		Name:        &newName,
 		Description: &newDesc,
 		IsArchived:  &archived,
@@ -179,7 +180,7 @@ func TestDeckService_Update_AllFields(t *testing.T) {
 
 	newCards := 30
 	pos := 5
-	result, err := svc.Update(ctx, userID, deckID, UpdateDeckRequest{
+	result, err := svc.Update(ctx, userID, deckID, dto.UpdateDeckRequest{
 		NewCardsPerDay: &newCards,
 		Position:       &pos,
 	})
@@ -199,7 +200,7 @@ func TestDeckService_Update_NotFound(t *testing.T) {
 	deckRepo.On("GetByID", ctx, deckID).Return(nil, domain.ErrNotFound)
 
 	name := "test"
-	_, err := svc.Update(ctx, uuid.New(), deckID, UpdateDeckRequest{Name: &name})
+	_, err := svc.Update(ctx, uuid.New(), deckID, dto.UpdateDeckRequest{Name: &name})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
@@ -215,7 +216,7 @@ func TestDeckService_Update_Forbidden(t *testing.T) {
 	deckRepo.On("GetByID", ctx, deckID).Return(deck, nil)
 
 	name := "hack"
-	_, err := svc.Update(ctx, uuid.New(), deckID, UpdateDeckRequest{Name: &name})
+	_, err := svc.Update(ctx, uuid.New(), deckID, dto.UpdateDeckRequest{Name: &name})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
 
@@ -269,7 +270,7 @@ func TestDeckService_Share_Success(t *testing.T) {
 	deckRepo.On("DeleteShare", ctx, deckID).Return(nil)
 	deckRepo.On("CreateShare", ctx, mock.AnythingOfType("*domain.DeckShare")).Return(nil)
 
-	share, err := svc.Share(ctx, userID, deckID, ShareDeckRequest{IsPublic: true})
+	share, err := svc.Share(ctx, userID, deckID, dto.ShareDeckRequest{IsPublic: true})
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, share.ShareCode)
@@ -287,7 +288,7 @@ func TestDeckService_Share_Forbidden(t *testing.T) {
 
 	deckRepo.On("GetByID", ctx, deckID).Return(deck, nil)
 
-	_, err := svc.Share(ctx, uuid.New(), deckID, ShareDeckRequest{})
+	_, err := svc.Share(ctx, uuid.New(), deckID, dto.ShareDeckRequest{})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
 
@@ -417,7 +418,7 @@ func TestDeckService_Export_Success(t *testing.T) {
 
 	require.NoError(t, err)
 
-	var export ExportDeck
+	var export dto.ExportDeck
 	require.NoError(t, json.Unmarshal(data, &export))
 	assert.Equal(t, "Export Deck", export.Name)
 	assert.Len(t, export.Cards, 2)
@@ -452,9 +453,9 @@ func TestDeckService_Import_Success(t *testing.T) {
 	deckRepo.On("Create", ctx, mock.AnythingOfType("*domain.Deck")).Return(nil)
 	cardRepo.On("BulkCreate", ctx, mock.AnythingOfType("[]*domain.Card")).Return(nil)
 
-	deck, err := svc.Import(ctx, userID, ImportDeckRequest{
+	deck, err := svc.Import(ctx, userID, dto.ImportDeckRequest{
 		Name: "Imported Deck",
-		Cards: []ExportCard{
+		Cards: []dto.ExportCard{
 			{Front: "Q1", Back: "A1", Tags: []string{"t1"}},
 			{Front: "Q2", Back: "A2"},
 		},
@@ -500,7 +501,7 @@ func TestDeckService_Share_NotFound(t *testing.T) {
 	deckID := uuid.New()
 	deckRepo.On("GetByID", ctx, deckID).Return(nil, domain.ErrNotFound)
 
-	_, err := svc.Share(ctx, uuid.New(), deckID, ShareDeckRequest{IsPublic: true})
+	_, err := svc.Share(ctx, uuid.New(), deckID, dto.ShareDeckRequest{IsPublic: true})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
@@ -563,9 +564,9 @@ func TestDeckService_Import_DeckCreateError(t *testing.T) {
 
 	deckRepo.On("Create", ctx, mock.AnythingOfType("*domain.Deck")).Return(assert.AnError)
 
-	_, err := svc.Import(ctx, uuid.New(), ImportDeckRequest{
+	_, err := svc.Import(ctx, uuid.New(), dto.ImportDeckRequest{
 		Name:  "Test",
-		Cards: []ExportCard{{Front: "Q", Back: "A"}},
+		Cards: []dto.ExportCard{{Front: "Q", Back: "A"}},
 	})
 	assert.Error(t, err)
 }

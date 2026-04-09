@@ -44,11 +44,7 @@ func NewStatsService(
 	}
 }
 
-type OverviewStats = dto.OverviewStats
-type HeatmapEntry = dto.HeatmapEntry
-type ForecastDay = dto.ForecastDay
-
-func (s *StatsService) Overview(ctx context.Context, userID uuid.UUID) (*OverviewStats, error) {
+func (s *StatsService) Overview(ctx context.Context, userID uuid.UUID) (*dto.OverviewStats, error) {
 	streak, err := s.statsRepo.GetStreak(ctx, userID)
 	if err != nil {
 		streak = 0
@@ -81,7 +77,7 @@ func (s *StatsService) Overview(ctx context.Context, userID uuid.UUID) (*Overvie
 		retention = math.Round(float64(totalCorrect)/float64(totalReviews)*10000) / 100
 	}
 
-	return &OverviewStats{
+	return &dto.OverviewStats{
 		TotalReviews:  totalReviews,
 		Streak:        streak,
 		RetentionRate: retention,
@@ -89,7 +85,7 @@ func (s *StatsService) Overview(ctx context.Context, userID uuid.UUID) (*Overvie
 	}, nil
 }
 
-func (s *StatsService) Heatmap(ctx context.Context, userID uuid.UUID) ([]HeatmapEntry, error) {
+func (s *StatsService) Heatmap(ctx context.Context, userID uuid.UUID) ([]dto.HeatmapEntry, error) {
 	now := time.Now()
 	yearAgo := now.AddDate(-1, 0, 0)
 
@@ -98,9 +94,9 @@ func (s *StatsService) Heatmap(ctx context.Context, userID uuid.UUID) ([]Heatmap
 		return nil, err
 	}
 
-	entries := make([]HeatmapEntry, len(counts))
+	entries := make([]dto.HeatmapEntry, len(counts))
 	for i, c := range counts {
-		entries[i] = HeatmapEntry{
+		entries[i] = dto.HeatmapEntry{
 			Date:  c.Date.Format("2006-01-02"),
 			Count: c.Count,
 		}
@@ -108,13 +104,13 @@ func (s *StatsService) Heatmap(ctx context.Context, userID uuid.UUID) ([]Heatmap
 	return entries, nil
 }
 
-func (s *StatsService) Forecast(ctx context.Context, userID uuid.UUID) ([]ForecastDay, error) {
+func (s *StatsService) Forecast(ctx context.Context, userID uuid.UUID) ([]dto.ForecastDay, error) {
 	now := time.Now()
-	forecast := make([]ForecastDay, 30)
+	forecast := make([]dto.ForecastDay, 30)
 
 	for i := range 30 {
 		day := now.AddDate(0, 0, i)
-		forecast[i] = ForecastDay{
+		forecast[i] = dto.ForecastDay{
 			Date: day.Format("2006-01-02"),
 		}
 	}
@@ -158,7 +154,6 @@ func (s *StatsService) DeckStats(ctx context.Context, userID uuid.UUID, deckID u
 
 // Mastery Level
 
-type DeckMastery = dto.DeckMastery
 
 func masteryLevel(percent float64) string {
 	switch {
@@ -173,7 +168,7 @@ func masteryLevel(percent float64) string {
 	}
 }
 
-func (s *StatsService) Mastery(ctx context.Context, userID uuid.UUID) ([]DeckMastery, error) {
+func (s *StatsService) Mastery(ctx context.Context, userID uuid.UUID) ([]dto.DeckMastery, error) {
 	decks, _, err := s.deckRepo.ListByUserID(ctx, userID, 1000, 0)
 	if err != nil {
 		return nil, err
@@ -182,7 +177,7 @@ func (s *StatsService) Mastery(ctx context.Context, userID uuid.UUID) ([]DeckMas
 	now := time.Now()
 	thirtyDaysAgo := now.AddDate(0, 0, -30)
 
-	var results []DeckMastery
+	var results []dto.DeckMastery
 	for _, d := range decks {
 		totalCards, matureCards, avgStability, err := s.cardRepo.GetDeckMasteryStats(ctx, d.ID)
 		if err != nil || totalCards == 0 {
@@ -214,7 +209,7 @@ func (s *StatsService) Mastery(ctx context.Context, userID uuid.UUID) ([]DeckMas
 			mastery = 100
 		}
 
-		results = append(results, DeckMastery{
+		results = append(results, dto.DeckMastery{
 			DeckID:         d.ID,
 			DeckName:       d.Name,
 			MasteryPercent: mastery,
@@ -232,10 +227,7 @@ func (s *StatsService) Mastery(ctx context.Context, userID uuid.UUID) ([]DeckMas
 
 // Weak Area Detection
 
-type WeakArea = dto.WeakArea
-type WeakAreasResponse = dto.WeakAreasResponse
-
-func (s *StatsService) WeakAreas(ctx context.Context, userID uuid.UUID) (*WeakAreasResponse, error) {
+func (s *StatsService) WeakAreas(ctx context.Context, userID uuid.UUID) (*dto.WeakAreasResponse, error) {
 	cards, err := s.cardRepo.GetWeakCards(ctx, userID, 50)
 	if err != nil {
 		return nil, err
@@ -258,12 +250,12 @@ func (s *StatsService) WeakAreas(ctx context.Context, userID uuid.UUID) (*WeakAr
 		}
 	}
 
-	var areas []WeakArea
+	var areas []dto.WeakArea
 	for tag, stats := range tagStats {
 		if stats.count < 2 {
 			continue
 		}
-		areas = append(areas, WeakArea{
+		areas = append(areas, dto.WeakArea{
 			Tag:          tag,
 			WeakCards:    stats.count,
 			AvgLapses:    math.Round(float64(stats.totalLapses)/float64(stats.count)*100) / 100,
@@ -277,7 +269,7 @@ func (s *StatsService) WeakAreas(ctx context.Context, userID uuid.UUID) (*WeakAr
 		topCards = topCards[:20]
 	}
 
-	return &WeakAreasResponse{
+	return &dto.WeakAreasResponse{
 		WeakAreas: areas,
 		WeakCards: topCards,
 	}, nil
@@ -285,10 +277,7 @@ func (s *StatsService) WeakAreas(ctx context.Context, userID uuid.UUID) (*WeakAr
 
 // Pre-test / Post-test Comparison
 
-type TestResult = dto.TestResult
-type TestComparison = dto.TestComparison
-
-func (s *StatsService) TestComparison(ctx context.Context, userID, deckID uuid.UUID) (*TestComparison, error) {
+func (s *StatsService) TestComparison(ctx context.Context, userID, deckID uuid.UUID) (*dto.TestComparison, error) {
 	deck, err := s.deckRepo.GetByID(ctx, deckID)
 	if err != nil {
 		return nil, err
@@ -297,7 +286,7 @@ func (s *StatsService) TestComparison(ctx context.Context, userID, deckID uuid.U
 		return nil, domain.ErrForbidden
 	}
 
-	result := &TestComparison{
+	result := &dto.TestComparison{
 		DeckID:   deckID,
 		DeckName: deck.Name,
 	}
@@ -330,7 +319,7 @@ func (s *StatsService) TestComparison(ctx context.Context, userID, deckID uuid.U
 	return result, nil
 }
 
-func (s *StatsService) buildTestResult(ctx context.Context, quizzes []domain.Quiz) *TestResult {
+func (s *StatsService) buildTestResult(ctx context.Context, quizzes []domain.Quiz) *dto.TestResult {
 	var best *domain.QuizAttempt
 
 	for _, q := range quizzes {
@@ -361,7 +350,7 @@ func (s *StatsService) buildTestResult(ctx context.Context, quizzes []domain.Qui
 		}
 	}
 
-	return &TestResult{
+	return &dto.TestResult{
 		QuizID:       best.QuizID,
 		BestScore:    best.Score,
 		TotalPoints:  best.TotalPoints,

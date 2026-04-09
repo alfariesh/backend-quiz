@@ -21,12 +21,7 @@ func NewCardService(cardRepo domain.CardRepository, deckRepo domain.DeckReposito
 	return &CardService{cardRepo: cardRepo, deckRepo: deckRepo}
 }
 
-type CreateCardRequest = dto.CreateCardRequest
-type UpdateCardRequest = dto.UpdateCardRequest
-type BatchCreateRequest = dto.BatchCreateRequest
-type SuspendRequest = dto.SuspendRequest
-
-func (s *CardService) Create(ctx context.Context, userID, deckID uuid.UUID, req CreateCardRequest) (*domain.Card, error) {
+func (s *CardService) Create(ctx context.Context, userID, deckID uuid.UUID, req dto.CreateCardRequest) (*domain.Card, error) {
 	deck, err := s.deckRepo.GetByID(ctx, deckID)
 	if err != nil {
 		return nil, err
@@ -59,7 +54,7 @@ func (s *CardService) Create(ctx context.Context, userID, deckID uuid.UUID, req 
 	return card, nil
 }
 
-func (s *CardService) BatchCreate(ctx context.Context, userID, deckID uuid.UUID, req BatchCreateRequest) ([]*domain.Card, error) {
+func (s *CardService) BatchCreate(ctx context.Context, userID, deckID uuid.UUID, req dto.BatchCreateRequest) ([]*domain.Card, error) {
 	deck, err := s.deckRepo.GetByID(ctx, deckID)
 	if err != nil {
 		return nil, err
@@ -110,7 +105,7 @@ func (s *CardService) List(ctx context.Context, userID, deckID uuid.UUID, filter
 	return s.cardRepo.ListByDeckID(ctx, deckID, filter, limit, offset)
 }
 
-func (s *CardService) Update(ctx context.Context, userID, cardID uuid.UUID, req UpdateCardRequest) (*domain.Card, error) {
+func (s *CardService) Update(ctx context.Context, userID, cardID uuid.UUID, req dto.UpdateCardRequest) (*domain.Card, error) {
 	card, err := s.cardRepo.GetByID(ctx, cardID)
 	if err != nil {
 		return nil, err

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
 )
 
@@ -509,7 +510,7 @@ func TestQuizService_CreateQuiz_Success(t *testing.T) {
 
 	quizRepo.On("Create", ctx, mock.AnythingOfType("*domain.Quiz")).Return(nil)
 
-	quiz, err := svc.CreateQuiz(ctx, userID, CreateQuizRequest{
+	quiz, err := svc.CreateQuiz(ctx, userID, dto.CreateQuizRequest{
 		Title:    "Fiqh Quiz",
 		QuizType: "mcq",
 	})
@@ -535,7 +536,7 @@ func TestQuizService_CreateQuiz_WithDeck(t *testing.T) {
 	quizRepo.On("Create", ctx, mock.AnythingOfType("*domain.Quiz")).Return(nil)
 
 	shuffle := false
-	quiz, err := svc.CreateQuiz(ctx, userID, CreateQuizRequest{
+	quiz, err := svc.CreateQuiz(ctx, userID, dto.CreateQuizRequest{
 		DeckID:           &deckID,
 		Title:            "Deck Quiz",
 		QuizType:         "mixed",
@@ -559,7 +560,7 @@ func TestQuizService_CreateQuiz_DeckForbidden(t *testing.T) {
 	deckID := uuid.New()
 	deckRepo.On("GetByID", ctx, deckID).Return(&domain.Deck{ID: deckID, UserID: uuid.New()}, nil)
 
-	_, err := svc.CreateQuiz(ctx, uuid.New(), CreateQuizRequest{
+	_, err := svc.CreateQuiz(ctx, uuid.New(), dto.CreateQuizRequest{
 		DeckID: &deckID, Title: "X", QuizType: "mcq",
 	})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
@@ -650,7 +651,7 @@ func TestQuizService_UpdateQuiz_Success(t *testing.T) {
 	newTitle := "New Title"
 	published := true
 	timeLimit := 600
-	result, err := svc.UpdateQuiz(ctx, userID, quizID, UpdateQuizRequest{
+	result, err := svc.UpdateQuiz(ctx, userID, quizID, dto.UpdateQuizRequest{
 		Title:            &newTitle,
 		IsPublished:      &published,
 		TimeLimitSeconds: &timeLimit,
@@ -675,7 +676,7 @@ func TestQuizService_UpdateQuiz_Forbidden(t *testing.T) {
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: uuid.New()}, nil)
 
 	title := "hack"
-	_, err := svc.UpdateQuiz(ctx, uuid.New(), quizID, UpdateQuizRequest{Title: &title})
+	_, err := svc.UpdateQuiz(ctx, uuid.New(), quizID, dto.UpdateQuizRequest{Title: &title})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
 
@@ -735,7 +736,7 @@ func TestQuizService_AddQuestion_Success(t *testing.T) {
 	quizRepo.On("CreateQuestion", ctx, mock.AnythingOfType("*domain.QuizQuestion")).Return(nil)
 
 	points := 5
-	q, err := svc.AddQuestion(ctx, userID, quizID, AddQuestionRequest{
+	q, err := svc.AddQuestion(ctx, userID, quizID, dto.AddQuestionRequest{
 		QuestionType:  domain.QuestionTypeTrueFalse,
 		QuestionText:  "Is this true?",
 		CorrectAnswer: "true",
@@ -764,7 +765,7 @@ func TestQuizService_AddQuestion_DefaultPoints(t *testing.T) {
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
 	quizRepo.On("CreateQuestion", ctx, mock.AnythingOfType("*domain.QuizQuestion")).Return(nil)
 
-	q, err := svc.AddQuestion(ctx, userID, quizID, AddQuestionRequest{
+	q, err := svc.AddQuestion(ctx, userID, quizID, dto.AddQuestionRequest{
 		QuestionType:  domain.QuestionTypeFillBlank,
 		QuestionText:  "Capital?",
 		CorrectAnswer: "Jakarta",
@@ -786,7 +787,7 @@ func TestQuizService_AddQuestion_Forbidden(t *testing.T) {
 	quizID := uuid.New()
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: uuid.New()}, nil)
 
-	_, err := svc.AddQuestion(ctx, uuid.New(), quizID, AddQuestionRequest{
+	_, err := svc.AddQuestion(ctx, uuid.New(), quizID, dto.AddQuestionRequest{
 		QuestionType: domain.QuestionTypeFillBlank, QuestionText: "X", CorrectAnswer: "Y",
 	})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
@@ -807,7 +808,7 @@ func TestQuizService_AddQuestion_InvalidOptions(t *testing.T) {
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
 
 	// MCQ without options
-	_, err := svc.AddQuestion(ctx, userID, quizID, AddQuestionRequest{
+	_, err := svc.AddQuestion(ctx, userID, quizID, dto.AddQuestionRequest{
 		QuestionType:  domain.QuestionTypeMCQ,
 		QuestionText:  "Q?",
 		CorrectAnswer: "A",
@@ -833,8 +834,8 @@ func TestQuizService_BatchAddQuestions_Success(t *testing.T) {
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(2, nil)
 	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
 
-	questions, err := svc.BatchAddQuestions(ctx, userID, quizID, BatchAddQuestionsRequest{
-		Questions: []AddQuestionRequest{
+	questions, err := svc.BatchAddQuestions(ctx, userID, quizID, dto.BatchAddQuestionsRequest{
+		Questions: []dto.AddQuestionRequest{
 			{QuestionType: domain.QuestionTypeTrueFalse, QuestionText: "Q1", CorrectAnswer: "true"},
 			{QuestionType: domain.QuestionTypeFillBlank, QuestionText: "Q2", CorrectAnswer: "answer"},
 		},
@@ -858,8 +859,8 @@ func TestQuizService_BatchAddQuestions_Forbidden(t *testing.T) {
 	quizID := uuid.New()
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: uuid.New()}, nil)
 
-	_, err := svc.BatchAddQuestions(ctx, uuid.New(), quizID, BatchAddQuestionsRequest{
-		Questions: []AddQuestionRequest{{QuestionType: domain.QuestionTypeFillBlank, QuestionText: "Q", CorrectAnswer: "A"}},
+	_, err := svc.BatchAddQuestions(ctx, uuid.New(), quizID, dto.BatchAddQuestionsRequest{
+		Questions: []dto.AddQuestionRequest{{QuestionType: domain.QuestionTypeFillBlank, QuestionText: "Q", CorrectAnswer: "A"}},
 	})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
@@ -879,8 +880,8 @@ func TestQuizService_BatchAddQuestions_ValidationError(t *testing.T) {
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
 
-	_, err := svc.BatchAddQuestions(ctx, userID, quizID, BatchAddQuestionsRequest{
-		Questions: []AddQuestionRequest{
+	_, err := svc.BatchAddQuestions(ctx, userID, quizID, dto.BatchAddQuestionsRequest{
+		Questions: []dto.AddQuestionRequest{
 			{QuestionType: domain.QuestionTypeFillBlank, QuestionText: "Good", CorrectAnswer: "A"},
 			{QuestionType: domain.QuestionTypeMCQ, QuestionText: "Bad MCQ", CorrectAnswer: "A"}, // no options
 		},
@@ -914,7 +915,7 @@ func TestQuizService_UpdateQuestion_Success(t *testing.T) {
 	newText := "New Question"
 	newAnswer := "New Answer"
 	newPoints := 3
-	q, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, UpdateQuestionRequest{
+	q, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, dto.UpdateQuestionRequest{
 		QuestionText:  &newText,
 		CorrectAnswer: &newAnswer,
 		Points:        &newPoints,
@@ -939,7 +940,7 @@ func TestQuizService_UpdateQuestion_Forbidden(t *testing.T) {
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: uuid.New()}, nil)
 
 	text := "hack"
-	_, err := svc.UpdateQuestion(ctx, uuid.New(), quizID, uuid.New(), UpdateQuestionRequest{QuestionText: &text})
+	_, err := svc.UpdateQuestion(ctx, uuid.New(), quizID, uuid.New(), dto.UpdateQuestionRequest{QuestionText: &text})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
 
@@ -962,7 +963,7 @@ func TestQuizService_UpdateQuestion_NotInQuiz(t *testing.T) {
 	}, nil)
 
 	text := "X"
-	_, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, UpdateQuestionRequest{QuestionText: &text})
+	_, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, dto.UpdateQuestionRequest{QuestionText: &text})
 	assert.ErrorIs(t, err, domain.ErrQuestionNotInQuiz)
 }
 
@@ -1053,7 +1054,7 @@ func TestQuizService_GenerateFromDeck_Success(t *testing.T) {
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
 	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
 
-	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, dto.GenerateFromDeckRequest{
 		DeckID:       deckID,
 		QuestionType: domain.QuestionTypeFillBlank,
 		Count:        2,
@@ -1086,7 +1087,7 @@ func TestQuizService_GenerateFromDeck_InsufficientCards(t *testing.T) {
 		{ID: uuid.New(), Front: "Q1", Back: "A1"},
 	}, 1, nil)
 
-	_, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+	_, err := svc.GenerateFromDeck(ctx, userID, quizID, dto.GenerateFromDeckRequest{
 		DeckID: deckID, QuestionType: domain.QuestionTypeFillBlank, Count: 5,
 	})
 	assert.ErrorIs(t, err, domain.ErrInsufficientCards)
@@ -1113,7 +1114,7 @@ func TestQuizService_GenerateFromDeck_MCQNeed4Cards(t *testing.T) {
 		{ID: uuid.New(), Front: "Q3", Back: "A3"},
 	}, 3, nil)
 
-	_, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+	_, err := svc.GenerateFromDeck(ctx, userID, quizID, dto.GenerateFromDeckRequest{
 		DeckID: deckID, QuestionType: domain.QuestionTypeMCQ, Count: 2,
 	})
 	assert.ErrorIs(t, err, domain.ErrInsufficientCards)
@@ -1135,7 +1136,7 @@ func TestQuizService_GenerateFromDeck_DeckForbidden(t *testing.T) {
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
 	deckRepo.On("GetByID", ctx, deckID).Return(&domain.Deck{ID: deckID, UserID: uuid.New()}, nil)
 
-	_, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+	_, err := svc.GenerateFromDeck(ctx, userID, quizID, dto.GenerateFromDeckRequest{
 		DeckID: deckID, QuestionType: domain.QuestionTypeFillBlank, Count: 1,
 	})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
@@ -1168,7 +1169,7 @@ func TestQuizService_GenerateAyatQuiz_Success(t *testing.T) {
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
 	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
 
-	questions, err := svc.GenerateAyatQuiz(ctx, userID, quizID, GenerateAyatQuizRequest{
+	questions, err := svc.GenerateAyatQuiz(ctx, userID, quizID, dto.GenerateAyatQuizRequest{
 		DeckID:       deckID,
 		QuestionType: domain.QuestionTypeAyatCloze,
 		Count:        2,
@@ -1201,7 +1202,7 @@ func TestQuizService_GenerateAyatQuiz_InsufficientAyatCards(t *testing.T) {
 		{ID: uuid.New(), Front: "Q1", Back: "A1", Tags: []string{"topic:fiqh"}},
 	}, 1, nil)
 
-	_, err := svc.GenerateAyatQuiz(ctx, userID, quizID, GenerateAyatQuizRequest{
+	_, err := svc.GenerateAyatQuiz(ctx, userID, quizID, dto.GenerateAyatQuizRequest{
 		DeckID: deckID, QuestionType: domain.QuestionTypeAyatCloze, Count: 1,
 	})
 	assert.ErrorIs(t, err, domain.ErrInsufficientCards)
@@ -1346,7 +1347,7 @@ func TestQuizService_SubmitAnswer_Correct(t *testing.T) {
 	attemptRepo.On("CreateAnswer", ctx, mock.AnythingOfType("*domain.QuizAnswer")).Return(nil)
 	attemptRepo.On("Update", ctx, mock.AnythingOfType("*domain.QuizAttempt")).Return(nil)
 
-	result, err := svc.SubmitAnswer(ctx, userID, attemptID, SubmitAnswerRequest{
+	result, err := svc.SubmitAnswer(ctx, userID, attemptID, dto.SubmitAnswerRequest{
 		QuestionID: questionID,
 		Answer:     "Jakarta",
 		DurationMS: 3000,
@@ -1386,7 +1387,7 @@ func TestQuizService_SubmitAnswer_Wrong(t *testing.T) {
 	attemptRepo.On("CreateAnswer", ctx, mock.AnythingOfType("*domain.QuizAnswer")).Return(nil)
 	attemptRepo.On("Update", ctx, mock.AnythingOfType("*domain.QuizAttempt")).Return(nil)
 
-	result, err := svc.SubmitAnswer(ctx, userID, attemptID, SubmitAnswerRequest{
+	result, err := svc.SubmitAnswer(ctx, userID, attemptID, dto.SubmitAnswerRequest{
 		QuestionID: questionID, Answer: "Bandung",
 	})
 
@@ -1410,7 +1411,7 @@ func TestQuizService_SubmitAnswer_Forbidden(t *testing.T) {
 		ID: attemptID, UserID: uuid.New(), StartedAt: time.Now(),
 	}, nil)
 
-	_, err := svc.SubmitAnswer(ctx, uuid.New(), attemptID, SubmitAnswerRequest{QuestionID: uuid.New(), Answer: "X"})
+	_, err := svc.SubmitAnswer(ctx, uuid.New(), attemptID, dto.SubmitAnswerRequest{QuestionID: uuid.New(), Answer: "X"})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
 
@@ -1431,7 +1432,7 @@ func TestQuizService_SubmitAnswer_AttemptCompleted(t *testing.T) {
 		ID: attemptID, UserID: userID, CompletedAt: &completedAt, StartedAt: time.Now(),
 	}, nil)
 
-	_, err := svc.SubmitAnswer(ctx, userID, attemptID, SubmitAnswerRequest{QuestionID: uuid.New(), Answer: "X"})
+	_, err := svc.SubmitAnswer(ctx, userID, attemptID, dto.SubmitAnswerRequest{QuestionID: uuid.New(), Answer: "X"})
 	assert.ErrorIs(t, err, domain.ErrAttemptCompleted)
 }
 
@@ -1456,7 +1457,7 @@ func TestQuizService_SubmitAnswer_QuestionNotInQuiz(t *testing.T) {
 		ID: questionID, QuizID: uuid.New(), // different quiz
 	}, nil)
 
-	_, err := svc.SubmitAnswer(ctx, userID, attemptID, SubmitAnswerRequest{QuestionID: questionID, Answer: "X"})
+	_, err := svc.SubmitAnswer(ctx, userID, attemptID, dto.SubmitAnswerRequest{QuestionID: questionID, Answer: "X"})
 	assert.ErrorIs(t, err, domain.ErrQuestionNotInQuiz)
 }
 
@@ -1482,7 +1483,7 @@ func TestQuizService_SubmitAnswer_AlreadyAnswered(t *testing.T) {
 	}, nil)
 	attemptRepo.On("GetAnswerByAttemptAndQuestion", ctx, attemptID, questionID).Return(&domain.QuizAnswer{}, nil)
 
-	_, err := svc.SubmitAnswer(ctx, userID, attemptID, SubmitAnswerRequest{QuestionID: questionID, Answer: "X"})
+	_, err := svc.SubmitAnswer(ctx, userID, attemptID, dto.SubmitAnswerRequest{QuestionID: questionID, Answer: "X"})
 	assert.ErrorIs(t, err, domain.ErrAlreadyAnswered)
 }
 
@@ -1519,15 +1520,15 @@ func TestQuizService_SubmitAnswer_WithFSRS(t *testing.T) {
 	reviewRepo.On("Create", ctx, mock.AnythingOfType("*domain.ReviewLog")).Return(nil)
 
 	rating := 3
-	result, err := svc.SubmitAnswer(ctx, userID, attemptID, SubmitAnswerRequest{
+	result, err := svc.SubmitAnswer(ctx, userID, attemptID, dto.SubmitAnswerRequest{
 		QuestionID: questionID,
 		Answer:     "Jakarta",
 		DurationMS: 5000,
-		FSRSCard: &FSRSCardState{
+		FSRSCard: &dto.FSRSCardState{
 			Due: now.Add(24 * time.Hour), Stability: 2.5, Difficulty: 5.0,
 			State: 1, LastReview: now,
 		},
-		FSRSLog: &FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.5, Difficulty: 5.0},
+		FSRSLog: &dto.FSRSLogState{ScheduledDays: 1, ElapsedDays: 0, Stability: 2.5, Difficulty: 5.0},
 		Rating:  &rating,
 	})
 
@@ -1999,7 +2000,7 @@ func TestQuizService_UpdateQuiz_AllFields(t *testing.T) {
 	newShuffle := false
 	newPublished := true
 	timeLimit := 300
-	result, err := svc.UpdateQuiz(ctx, userID, quizID, UpdateQuizRequest{
+	result, err := svc.UpdateQuiz(ctx, userID, quizID, dto.UpdateQuizRequest{
 		Title:            &newTitle,
 		Description:      &newDesc,
 		QuizType:         &newType,
@@ -2030,7 +2031,7 @@ func TestQuizService_UpdateQuiz_NotFound(t *testing.T) {
 	quizRepo.On("GetByID", ctx, quizID).Return(nil, domain.ErrNotFound)
 
 	title := "X"
-	_, err := svc.UpdateQuiz(ctx, uuid.New(), quizID, UpdateQuizRequest{Title: &title})
+	_, err := svc.UpdateQuiz(ctx, uuid.New(), quizID, dto.UpdateQuizRequest{Title: &title})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
@@ -2063,7 +2064,7 @@ func TestQuizService_UpdateQuestion_AllFields(t *testing.T) {
 	newPoints := 5
 	opts := json.RawMessage(`null`)
 
-	q, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, UpdateQuestionRequest{
+	q, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, dto.UpdateQuestionRequest{
 		QuestionType:  &newType,
 		QuestionText:  &newText,
 		Options:       &opts,
@@ -2131,7 +2132,7 @@ func TestQuizService_CreateQuiz_DeckNotFound(t *testing.T) {
 	deckID := uuid.New()
 	deckRepo.On("GetByID", ctx, deckID).Return(nil, domain.ErrNotFound)
 
-	_, err := svc.CreateQuiz(ctx, uuid.New(), CreateQuizRequest{
+	_, err := svc.CreateQuiz(ctx, uuid.New(), dto.CreateQuizRequest{
 		DeckID: &deckID, Title: "X", QuizType: "mcq",
 	})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
@@ -2172,8 +2173,8 @@ func TestQuizService_BatchAddQuestions_CountError(t *testing.T) {
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, assert.AnError)
 
-	_, err := svc.BatchAddQuestions(ctx, userID, quizID, BatchAddQuestionsRequest{
-		Questions: []AddQuestionRequest{
+	_, err := svc.BatchAddQuestions(ctx, userID, quizID, dto.BatchAddQuestionsRequest{
+		Questions: []dto.AddQuestionRequest{
 			{QuestionType: domain.QuestionTypeFillBlank, QuestionText: "Q", CorrectAnswer: "A"},
 		},
 	})
@@ -2209,7 +2210,7 @@ func TestQuizService_GenerateFromDeck_MixedType(t *testing.T) {
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
 	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
 
-	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, dto.GenerateFromDeckRequest{
 		DeckID:       deckID,
 		QuestionType: domain.QuizTypeMixed,
 		Count:        3,
@@ -2247,7 +2248,7 @@ func TestQuizService_GenerateFromDeck_TrueFalseType(t *testing.T) {
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
 	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
 
-	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, dto.GenerateFromDeckRequest{
 		DeckID:       deckID,
 		QuestionType: domain.QuestionTypeTrueFalse,
 		Count:        2,
@@ -2286,7 +2287,7 @@ func TestQuizService_GenerateFromDeck_MCQType(t *testing.T) {
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
 	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
 
-	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, dto.GenerateFromDeckRequest{
 		DeckID:       deckID,
 		QuestionType: domain.QuestionTypeMCQ,
 		Count:        2,
@@ -2325,7 +2326,7 @@ func TestQuizService_GenerateFromDeck_CountExceedsCards(t *testing.T) {
 	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
 
 	// Request 100 but only 3 cards → should generate 3
-	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, GenerateFromDeckRequest{
+	questions, err := svc.GenerateFromDeck(ctx, userID, quizID, dto.GenerateFromDeckRequest{
 		DeckID:       deckID,
 		QuestionType: domain.QuestionTypeFillBlank,
 		Count:        100,
@@ -2368,7 +2369,7 @@ func TestQuizService_GenerateAyatQuiz_MixedAyat(t *testing.T) {
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
 	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
 
-	questions, err := svc.GenerateAyatQuiz(ctx, userID, quizID, GenerateAyatQuizRequest{
+	questions, err := svc.GenerateAyatQuiz(ctx, userID, quizID, dto.GenerateAyatQuizRequest{
 		DeckID:       deckID,
 		QuestionType: domain.QuizTypeMixedAyat,
 		Count:        3,
@@ -2403,7 +2404,7 @@ func TestQuizService_GenerateAyatQuiz_ContinuationType(t *testing.T) {
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
 	quizRepo.On("BulkCreateQuestions", ctx, mock.AnythingOfType("[]*domain.QuizQuestion")).Return(nil)
 
-	questions, err := svc.GenerateAyatQuiz(ctx, userID, quizID, GenerateAyatQuizRequest{
+	questions, err := svc.GenerateAyatQuiz(ctx, userID, quizID, dto.GenerateAyatQuizRequest{
 		DeckID:       deckID,
 		QuestionType: domain.QuestionTypeAyatContinuation,
 		Count:        2,
@@ -2432,7 +2433,7 @@ func TestQuizService_GenerateAyatQuiz_DeckForbidden(t *testing.T) {
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
 	deckRepo.On("GetByID", ctx, deckID).Return(&domain.Deck{ID: deckID, UserID: uuid.New()}, nil) // different owner
 
-	_, err := svc.GenerateAyatQuiz(ctx, userID, quizID, GenerateAyatQuizRequest{
+	_, err := svc.GenerateAyatQuiz(ctx, userID, quizID, dto.GenerateAyatQuizRequest{
 		DeckID: deckID, QuestionType: domain.QuestionTypeAyatCloze, Count: 1,
 	})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
@@ -2452,7 +2453,7 @@ func TestQuizService_GenerateAyatQuiz_QuizForbidden(t *testing.T) {
 
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: uuid.New()}, nil)
 
-	_, err := svc.GenerateAyatQuiz(ctx, uuid.New(), quizID, GenerateAyatQuizRequest{
+	_, err := svc.GenerateAyatQuiz(ctx, uuid.New(), quizID, dto.GenerateAyatQuizRequest{
 		DeckID: deckID, QuestionType: domain.QuestionTypeAyatCloze, Count: 1,
 	})
 	assert.ErrorIs(t, err, domain.ErrForbidden)
@@ -2490,10 +2491,10 @@ func TestQuizService_SubmitAnswer_FSRS_SuspendedCard(t *testing.T) {
 	// Card is suspended — FSRS should be skipped
 	cardRepo.On("GetByID", ctx, cardID).Return(&domain.Card{ID: cardID, IsSuspended: true}, nil)
 
-	result, err := svc.SubmitAnswer(ctx, userID, attemptID, SubmitAnswerRequest{
+	result, err := svc.SubmitAnswer(ctx, userID, attemptID, dto.SubmitAnswerRequest{
 		QuestionID: questionID,
 		Answer:     "test",
-		FSRSCard:   &FSRSCardState{Due: now, Stability: 2.5, Difficulty: 5.0, State: 1, LastReview: now},
+		FSRSCard:   &dto.FSRSCardState{Due: now, Stability: 2.5, Difficulty: 5.0, State: 1, LastReview: now},
 	})
 
 	require.NoError(t, err)
@@ -2535,10 +2536,10 @@ func TestQuizService_SubmitAnswer_FSRS_DefaultRatingIncorrect(t *testing.T) {
 	reviewRepo.On("Create", ctx, mock.AnythingOfType("*domain.ReviewLog")).Return(nil)
 
 	// No Rating provided + wrong answer → defaults to RatingAgain
-	result, err := svc.SubmitAnswer(ctx, userID, attemptID, SubmitAnswerRequest{
+	result, err := svc.SubmitAnswer(ctx, userID, attemptID, dto.SubmitAnswerRequest{
 		QuestionID: questionID,
 		Answer:     "wrong",
-		FSRSCard:   &FSRSCardState{Due: now, Stability: 2.5, Difficulty: 5.0, State: 2, LastReview: now},
+		FSRSCard:   &dto.FSRSCardState{Due: now, Stability: 2.5, Difficulty: 5.0, State: 2, LastReview: now},
 		// No Rating, No FSRSLog
 	})
 
@@ -2636,7 +2637,7 @@ func TestQuizService_AddQuestion_CountError(t *testing.T) {
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, assert.AnError)
 
-	_, err := svc.AddQuestion(ctx, userID, quizID, AddQuestionRequest{
+	_, err := svc.AddQuestion(ctx, userID, quizID, dto.AddQuestionRequest{
 		QuestionType: domain.QuestionTypeFillBlank, QuestionText: "Q", CorrectAnswer: "A",
 	})
 	assert.Error(t, err)
@@ -2741,7 +2742,7 @@ func TestQuizService_UpdateQuestion_GetQuestionError(t *testing.T) {
 	quizRepo.On("GetByID", ctx, quizID).Return(&domain.Quiz{ID: quizID, UserID: userID}, nil)
 	quizRepo.On("GetQuestionByID", ctx, questionID).Return(nil, assert.AnError)
 
-	_, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, UpdateQuestionRequest{})
+	_, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, dto.UpdateQuestionRequest{})
 	assert.ErrorIs(t, err, assert.AnError)
 }
 
@@ -2765,7 +2766,7 @@ func TestQuizService_UpdateQuestion_UpdateRepoError(t *testing.T) {
 	}, nil)
 	quizRepo.On("UpdateQuestion", ctx, mock.Anything).Return(assert.AnError)
 
-	_, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, UpdateQuestionRequest{})
+	_, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, dto.UpdateQuestionRequest{})
 	assert.ErrorIs(t, err, assert.AnError)
 }
 
@@ -2788,7 +2789,7 @@ func TestQuizService_UpdateQuestion_ValidationError(t *testing.T) {
 	}, nil)
 
 	// MCQ with nil options should fail validation
-	_, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, UpdateQuestionRequest{})
+	_, err := svc.UpdateQuestion(ctx, userID, quizID, questionID, dto.UpdateQuestionRequest{})
 	assert.Error(t, err)
 }
 
@@ -2810,8 +2811,8 @@ func TestQuizService_BatchAddQuestions_BulkCreateError(t *testing.T) {
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
 	quizRepo.On("BulkCreateQuestions", ctx, mock.Anything).Return(assert.AnError)
 
-	_, err := svc.BatchAddQuestions(ctx, userID, quizID, BatchAddQuestionsRequest{
-		Questions: []AddQuestionRequest{
+	_, err := svc.BatchAddQuestions(ctx, userID, quizID, dto.BatchAddQuestionsRequest{
+		Questions: []dto.AddQuestionRequest{
 			{QuestionType: "true_false", QuestionText: "Is this true?", CorrectAnswer: "true"},
 		},
 	})
@@ -2835,8 +2836,8 @@ func TestQuizService_BatchAddQuestions_CustomPoints(t *testing.T) {
 	quizRepo.On("CountQuestionsByQuizID", ctx, quizID).Return(0, nil)
 	quizRepo.On("BulkCreateQuestions", ctx, mock.Anything).Return(nil)
 
-	questions, err := svc.BatchAddQuestions(ctx, userID, quizID, BatchAddQuestionsRequest{
-		Questions: []AddQuestionRequest{
+	questions, err := svc.BatchAddQuestions(ctx, userID, quizID, dto.BatchAddQuestionsRequest{
+		Questions: []dto.AddQuestionRequest{
 			{QuestionType: "true_false", QuestionText: "Is this true?", CorrectAnswer: "true", Points: &pts},
 		},
 	})
@@ -2899,6 +2900,6 @@ func TestQuizService_SubmitAnswer_GetAttemptError(t *testing.T) {
 	attemptID := uuid.New()
 	attemptRepo.On("GetByID", ctx, attemptID).Return(nil, assert.AnError)
 
-	_, err := svc.SubmitAnswer(ctx, uuid.New(), attemptID, SubmitAnswerRequest{QuestionID: uuid.New()})
+	_, err := svc.SubmitAnswer(ctx, uuid.New(), attemptID, dto.SubmitAnswerRequest{QuestionID: uuid.New()})
 	assert.ErrorIs(t, err, assert.AnError)
 }

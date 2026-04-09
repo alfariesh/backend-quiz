@@ -41,18 +41,7 @@ func NewStudyService(
 	}
 }
 
-type StartSessionRequest = dto.StartSessionRequest
-type StartSessionResponse = dto.StartSessionResponse
-type DueCounts = dto.DueCounts
-type FSRSCardState = dto.FSRSCardState
-type FSRSLogState = dto.FSRSLogState
-type SubmitReviewRequest = dto.SubmitReviewRequest
-type ReviewResult = dto.ReviewResult
-type BatchReviewRequest = dto.BatchReviewRequest
-type BatchReviewItem = dto.BatchReviewItem
-type BatchReviewResult = dto.BatchReviewResult
-
-func (s *StudyService) StartSession(ctx context.Context, userID uuid.UUID, req StartSessionRequest) (*StartSessionResponse, error) {
+func (s *StudyService) StartSession(ctx context.Context, userID uuid.UUID, req dto.StartSessionRequest) (*dto.StartSessionResponse, error) {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -74,7 +63,7 @@ func (s *StudyService) StartSession(ctx context.Context, userID uuid.UUID, req S
 
 	counts := s.countCards(cards)
 
-	return &StartSessionResponse{
+	return &dto.StartSessionResponse{
 		Session: session,
 		Cards:   cards,
 		Counts:  counts,
@@ -92,7 +81,7 @@ func (s *StudyService) GetSession(ctx context.Context, userID uuid.UUID, session
 	return session, nil
 }
 
-func (s *StudyService) SubmitReview(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID, req SubmitReviewRequest) (*ReviewResult, error) {
+func (s *StudyService) SubmitReview(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID, req dto.SubmitReviewRequest) (*dto.ReviewResult, error) {
 	session, err := s.sessionRepo.GetByID(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -166,14 +155,14 @@ func (s *StudyService) SubmitReview(ctx context.Context, userID uuid.UUID, sessi
 		return nil, err
 	}
 
-	return &ReviewResult{
+	return &dto.ReviewResult{
 		Card:      *card,
 		ReviewLog: *reviewLog,
 		NextDue:   card.Due,
 	}, nil
 }
 
-func (s *StudyService) BatchReview(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID, req BatchReviewRequest) (*BatchReviewResult, error) {
+func (s *StudyService) BatchReview(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID, req dto.BatchReviewRequest) (*dto.BatchReviewResult, error) {
 	session, err := s.sessionRepo.GetByID(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -248,7 +237,7 @@ func (s *StudyService) BatchReview(ctx context.Context, userID uuid.UUID, sessio
 		return nil, err
 	}
 
-	return &BatchReviewResult{
+	return &dto.BatchReviewResult{
 		Processed: processed,
 		Errors:    errCount,
 	}, nil
@@ -274,9 +263,7 @@ func (s *StudyService) EndSession(ctx context.Context, userID uuid.UUID, session
 	return session, nil
 }
 
-type ReminderResponse = dto.ReminderResponse
-
-func (s *StudyService) GetReminders(ctx context.Context, userID uuid.UUID, hoursAhead int) (*ReminderResponse, error) {
+func (s *StudyService) GetReminders(ctx context.Context, userID uuid.UUID, hoursAhead int) (*dto.ReminderResponse, error) {
 	now := time.Now()
 	horizon := now.Add(time.Duration(hoursAhead) * time.Hour)
 
@@ -297,7 +284,7 @@ func (s *StudyService) GetReminders(ctx context.Context, userID uuid.UUID, hours
 
 	nextDue, _ := s.cardRepo.GetNextDueAt(ctx, userID, now)
 
-	return &ReminderResponse{
+	return &dto.ReminderResponse{
 		Decks:        summaries,
 		TotalDue:     totalDue,
 		DueSoon:      dueSoon,
@@ -307,8 +294,8 @@ func (s *StudyService) GetReminders(ctx context.Context, userID uuid.UUID, hours
 	}, nil
 }
 
-func (s *StudyService) countCards(cards []domain.Card) DueCounts {
-	counts := DueCounts{}
+func (s *StudyService) countCards(cards []domain.Card) dto.DueCounts {
+	counts := dto.DueCounts{}
 	for _, c := range cards {
 		switch c.State {
 		case domain.CardStateNew:
@@ -324,7 +311,7 @@ func (s *StudyService) countCards(cards []domain.Card) DueCounts {
 }
 
 // applyFSRSCardState writes the client-computed FSRS state onto a domain card.
-func applyFSRSCardState(card *domain.Card, state FSRSCardState) {
+func applyFSRSCardState(card *domain.Card, state dto.FSRSCardState) {
 	card.Due = state.Due
 	card.Stability = state.Stability
 	card.Difficulty = state.Difficulty
@@ -337,7 +324,7 @@ func applyFSRSCardState(card *domain.Card, state FSRSCardState) {
 }
 
 // validateFSRSState performs basic sanity checks on client-provided FSRS state.
-func validateFSRSState(card FSRSCardState) error {
+func validateFSRSState(card dto.FSRSCardState) error {
 	if card.State < 0 || card.State > 3 {
 		return fmt.Errorf("%w: invalid card state", domain.ErrInvalidInput)
 	}

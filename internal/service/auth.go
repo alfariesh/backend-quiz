@@ -34,12 +34,7 @@ func NewAuthService(userRepo domain.UserRepository, uow domain.UnitOfWork, jwtSe
 	}
 }
 
-type TokenPair = dto.TokenPair
-type RegisterRequest = dto.RegisterRequest
-type LoginRequest = dto.LoginRequest
-type UpdateProfileRequest = dto.UpdateProfileRequest
-
-func (s *AuthService) Register(ctx context.Context, req RegisterRequest) (*TokenPair, *domain.User, error) {
+func (s *AuthService) Register(ctx context.Context, req dto.RegisterRequest) (*dto.TokenPair, *domain.User, error) {
 	existing, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
 		return nil, nil, err
@@ -75,7 +70,7 @@ func (s *AuthService) Register(ctx context.Context, req RegisterRequest) (*Token
 	return tokens, user, nil
 }
 
-func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*TokenPair, *domain.User, error) {
+func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest) (*dto.TokenPair, *domain.User, error) {
 	user, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -96,7 +91,7 @@ func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*TokenPair, 
 	return tokens, user, nil
 }
 
-func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
+func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*dto.TokenPair, error) {
 	token, err := jwt.Parse(refreshToken, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
@@ -135,7 +130,7 @@ func (s *AuthService) GetProfile(ctx context.Context, userID uuid.UUID) (*domain
 	return s.userRepo.GetByID(ctx, userID)
 }
 
-func (s *AuthService) UpdateProfile(ctx context.Context, userID uuid.UUID, req UpdateProfileRequest) (*domain.User, error) {
+func (s *AuthService) UpdateProfile(ctx context.Context, userID uuid.UUID, req dto.UpdateProfileRequest) (*domain.User, error) {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -173,7 +168,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uuid.UUID, req U
 	return user, nil
 }
 
-func (s *AuthService) FindOrCreateOAuthUser(ctx context.Context, provider, providerID, email, displayName string, avatarURL *string) (*TokenPair, *domain.User, error) {
+func (s *AuthService) FindOrCreateOAuthUser(ctx context.Context, provider, providerID, email, displayName string, avatarURL *string) (*dto.TokenPair, *domain.User, error) {
 	// Check if OAuth account exists
 	oauthAccount, err := s.userRepo.GetOAuthAccount(ctx, provider, providerID)
 	if err == nil {
@@ -233,7 +228,7 @@ func (s *AuthService) FindOrCreateOAuthUser(ctx context.Context, provider, provi
 	return tokens, user, nil
 }
 
-func (s *AuthService) generateTokens(userID uuid.UUID) (*TokenPair, error) {
+func (s *AuthService) generateTokens(userID uuid.UUID) (*dto.TokenPair, error) {
 	now := time.Now()
 
 	accessClaims := jwt.MapClaims{
@@ -258,7 +253,7 @@ func (s *AuthService) generateTokens(userID uuid.UUID) (*TokenPair, error) {
 		return nil, err
 	}
 
-	return &TokenPair{
+	return &dto.TokenPair{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresAt:    now.Add(s.accessDuration).Unix(),
