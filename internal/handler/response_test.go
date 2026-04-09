@@ -101,6 +101,37 @@ func TestHandleError(t *testing.T) {
 	}
 }
 
+func TestHandleError_AppError(t *testing.T) {
+	tests := []struct {
+		name       string
+		code       domain.ErrorCode
+		wantStatus int
+	}{
+		{"not found", domain.CodeNotFound, http.StatusNotFound},
+		{"already exists", domain.CodeAlreadyExists, http.StatusConflict},
+		{"conflict", domain.CodeConflict, http.StatusConflict},
+		{"unauthorized", domain.CodeUnauthorized, http.StatusUnauthorized},
+		{"invalid credentials", domain.CodeInvalidCredentials, http.StatusUnauthorized},
+		{"forbidden", domain.CodeForbidden, http.StatusForbidden},
+		{"invalid input", domain.CodeInvalidInput, http.StatusBadRequest},
+		{"too many requests", domain.CodeTooManyRequests, http.StatusTooManyRequests},
+		{"unknown code", domain.ErrorCode("UNKNOWN"), http.StatusInternalServerError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			appErr := domain.NewAppError(domain.ErrInvalidInput, tt.code, "test message")
+			rec := httptest.NewRecorder()
+			HandleError(rec, appErr)
+			assert.Equal(t, tt.wantStatus, rec.Code)
+
+			var resp APIResponse
+			require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
+			assert.Equal(t, "test message", resp.Error)
+		})
+	}
+}
+
 // --- DecodeJSON ---
 
 func TestDecodeJSON_Success(t *testing.T) {

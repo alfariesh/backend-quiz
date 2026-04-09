@@ -239,6 +239,44 @@ func TestCardHandler_List_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
+func TestCardHandler_List_WithFilters(t *testing.T) {
+	svc := mockport.NewMockCardServicer(t)
+	h := NewCardHandler(svc)
+	router := setupCardRouter(h)
+
+	uid := uuid.New()
+	deckID := uuid.New()
+
+	svc.EXPECT().List(mock.Anything, uid, deckID, mock.Anything, 10, 5).Return(
+		[]domain.Card{{Front: "Q"}}, 1, nil,
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/decks/"+deckID.String()+"/cards?tag=quran&q=surah&state=1&limit=10&offset=5", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestCardHandler_List_ServiceError(t *testing.T) {
+	svc := mockport.NewMockCardServicer(t)
+	h := NewCardHandler(svc)
+	router := setupCardRouter(h)
+
+	uid := uuid.New()
+	deckID := uuid.New()
+
+	svc.EXPECT().List(mock.Anything, uid, deckID, mock.Anything, 20, 0).Return(nil, 0, domain.ErrForbidden)
+
+	req := httptest.NewRequest(http.MethodGet, "/decks/"+deckID.String()+"/cards", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
 func TestCardHandler_List_InvalidDeckID(t *testing.T) {
 	svc := mockport.NewMockCardServicer(t)
 	h := NewCardHandler(svc)
@@ -406,6 +444,108 @@ func TestCardHandler_Suspend_InvalidID(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestCardHandler_Update_ServiceError(t *testing.T) {
+	svc := mockport.NewMockCardServicer(t)
+	h := NewCardHandler(svc)
+	router := setupCardRouter(h)
+
+	uid := uuid.New()
+	cardID := uuid.New()
+	svc.EXPECT().Update(mock.Anything, uid, cardID, mock.Anything).Return(nil, domain.ErrForbidden)
+
+	body := `{"front":"New"}`
+	req := httptest.NewRequest(http.MethodPut, "/cards/"+cardID.String(), strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestCardHandler_Delete_ServiceError(t *testing.T) {
+	svc := mockport.NewMockCardServicer(t)
+	h := NewCardHandler(svc)
+	router := setupCardRouter(h)
+
+	uid := uuid.New()
+	cardID := uuid.New()
+	svc.EXPECT().Delete(mock.Anything, uid, cardID).Return(domain.ErrForbidden)
+
+	req := httptest.NewRequest(http.MethodDelete, "/cards/"+cardID.String(), nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestCardHandler_ResetFSRS_ServiceError(t *testing.T) {
+	svc := mockport.NewMockCardServicer(t)
+	h := NewCardHandler(svc)
+	router := setupCardRouter(h)
+
+	uid := uuid.New()
+	cardID := uuid.New()
+	svc.EXPECT().ResetFSRS(mock.Anything, uid, cardID).Return(nil, domain.ErrForbidden)
+
+	req := httptest.NewRequest(http.MethodPost, "/cards/"+cardID.String()+"/reset", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestCardHandler_Suspend_ServiceError(t *testing.T) {
+	svc := mockport.NewMockCardServicer(t)
+	h := NewCardHandler(svc)
+	router := setupCardRouter(h)
+
+	uid := uuid.New()
+	cardID := uuid.New()
+	svc.EXPECT().Suspend(mock.Anything, uid, cardID, true).Return(domain.ErrForbidden)
+
+	body := `{"suspended":true}`
+	req := httptest.NewRequest(http.MethodPut, "/cards/"+cardID.String()+"/suspend", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestCardHandler_BatchCreate_InvalidDeckID(t *testing.T) {
+	svc := mockport.NewMockCardServicer(t)
+	h := NewCardHandler(svc)
+	router := setupCardRouter(h)
+
+	body := `{"cards":[{"front":"Q","back":"A"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/decks/bad-id/cards/batch", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uuid.New()))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestCardHandler_BatchCreate_ServiceError(t *testing.T) {
+	svc := mockport.NewMockCardServicer(t)
+	h := NewCardHandler(svc)
+	router := setupCardRouter(h)
+
+	uid := uuid.New()
+	deckID := uuid.New()
+	svc.EXPECT().BatchCreate(mock.Anything, uid, deckID, mock.Anything).Return(nil, domain.ErrForbidden)
+
+	body := `{"cards":[{"front":"Q","back":"A"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/decks/"+deckID.String()+"/cards/batch", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
 func TestCardHandler_Suspend_InvalidBody(t *testing.T) {

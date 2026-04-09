@@ -384,6 +384,48 @@ func TestQuizHandler_BatchAddQuestions_ValidationError(t *testing.T) {
 
 // --- GenerateFromDeck ---
 
+func TestQuizHandler_GenerateFromDeck_Success(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	svc.EXPECT().GenerateFromDeck(mock.Anything, uid, quizID, mock.Anything).Return(
+		[]*domain.QuizQuestion{{ID: uuid.New(), QuizID: quizID, QuestionText: "Generated Q"}}, nil,
+	)
+
+	body := `{"deck_id":"` + deckID.String() + `","question_type":"mcq","count":5}`
+	req := httptest.NewRequest(http.MethodPost, "/quizzes/"+quizID.String()+"/generate", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+}
+
+func TestQuizHandler_GenerateFromDeck_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	svc.EXPECT().GenerateFromDeck(mock.Anything, uid, quizID, mock.Anything).Return(nil, domain.ErrInsufficientCards)
+
+	body := `{"deck_id":"` + deckID.String() + `","question_type":"mcq","count":5}`
+	req := httptest.NewRequest(http.MethodPost, "/quizzes/"+quizID.String()+"/generate", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
 func TestQuizHandler_GenerateFromDeck_InvalidQuizID(t *testing.T) {
 	svc := mockport.NewMockQuizServicer(t)
 	h := NewQuizHandler(svc)
@@ -428,6 +470,63 @@ func TestQuizHandler_GenerateFromDeck_ValidationError(t *testing.T) {
 }
 
 // --- GenerateAyatQuiz ---
+
+func TestQuizHandler_GenerateAyatQuiz_Success(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	svc.EXPECT().GenerateAyatQuiz(mock.Anything, uid, quizID, mock.Anything).Return(
+		[]*domain.QuizQuestion{{ID: uuid.New(), QuizID: quizID, QuestionText: "Ayat Q"}}, nil,
+	)
+
+	body := `{"deck_id":"` + deckID.String() + `","question_type":"ayat_cloze","count":5}`
+	req := httptest.NewRequest(http.MethodPost, "/quizzes/"+quizID.String()+"/generate-ayat", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+}
+
+func TestQuizHandler_GenerateAyatQuiz_ValidationError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	quizID := uuid.New()
+	body := `{"deck_id":"` + uuid.New().String() + `","question_type":"invalid","count":0}`
+	req := httptest.NewRequest(http.MethodPost, "/quizzes/"+quizID.String()+"/generate-ayat", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uuid.New()))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestQuizHandler_GenerateAyatQuiz_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	deckID := uuid.New()
+
+	svc.EXPECT().GenerateAyatQuiz(mock.Anything, uid, quizID, mock.Anything).Return(nil, domain.ErrInsufficientCards)
+
+	body := `{"deck_id":"` + deckID.String() + `","question_type":"ayat_cloze","count":5}`
+	req := httptest.NewRequest(http.MethodPost, "/quizzes/"+quizID.String()+"/generate-ayat", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
 
 func TestQuizHandler_GenerateAyatQuiz_InvalidQuizID(t *testing.T) {
 	svc := mockport.NewMockQuizServicer(t)
@@ -704,6 +803,48 @@ func TestQuizHandler_GetAttempt_NotFound(t *testing.T) {
 }
 
 // --- SubmitAnswer ---
+
+func TestQuizHandler_SubmitAnswer_Success(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	attemptID := uuid.New()
+	questionID := uuid.New()
+
+	svc.EXPECT().SubmitAnswer(mock.Anything, uid, attemptID, mock.Anything).Return(
+		&dto.AnswerResult{IsCorrect: true, CorrectAnswer: "A"}, nil,
+	)
+
+	body := `{"question_id":"` + questionID.String() + `","answer":"A"}`
+	req := httptest.NewRequest(http.MethodPost, "/attempts/"+attemptID.String()+"/answers", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestQuizHandler_SubmitAnswer_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	attemptID := uuid.New()
+	questionID := uuid.New()
+
+	svc.EXPECT().SubmitAnswer(mock.Anything, uid, attemptID, mock.Anything).Return(nil, domain.ErrAlreadyAnswered)
+
+	body := `{"question_id":"` + questionID.String() + `","answer":"A"}`
+	req := httptest.NewRequest(http.MethodPost, "/attempts/"+attemptID.String()+"/answers", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
 
 func TestQuizHandler_SubmitAnswer_InvalidAttemptID(t *testing.T) {
 	svc := mockport.NewMockQuizServicer(t)

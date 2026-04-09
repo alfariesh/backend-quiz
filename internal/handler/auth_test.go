@@ -190,6 +190,111 @@ func TestAuthHandler_Refresh_InvalidBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
+// --- UpdateProfile ---
+
+func TestAuthHandler_UpdateProfile_Success(t *testing.T) {
+	svc := mockport.NewMockAuthServicer(t)
+	h := NewAuthHandler(svc)
+
+	uid := uuid.New()
+	displayName := "New Name"
+	svc.EXPECT().UpdateProfile(mock.Anything, uid, mock.Anything).Return(
+		&domain.User{ID: uid, DisplayName: displayName, Email: "test@example.com"}, nil,
+	)
+
+	body := `{"display_name":"New Name"}`
+	req := httptest.NewRequest(http.MethodPut, "/auth/me", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	h.UpdateProfile(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	var resp APIResponse
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
+	data := resp.Data.(map[string]any)
+	assert.Equal(t, "New Name", data["display_name"])
+}
+
+func TestAuthHandler_UpdateProfile_NoUserID(t *testing.T) {
+	svc := mockport.NewMockAuthServicer(t)
+	h := NewAuthHandler(svc)
+
+	body := `{"display_name":"New Name"}`
+	req := httptest.NewRequest(http.MethodPut, "/auth/me", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	h.UpdateProfile(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestAuthHandler_UpdateProfile_InvalidBody(t *testing.T) {
+	svc := mockport.NewMockAuthServicer(t)
+	h := NewAuthHandler(svc)
+
+	req := httptest.NewRequest(http.MethodPut, "/auth/me", strings.NewReader(`{bad`))
+	req = req.WithContext(ctxWithUserID(uuid.New()))
+	rec := httptest.NewRecorder()
+
+	h.UpdateProfile(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestAuthHandler_UpdateProfile_ValidationError(t *testing.T) {
+	svc := mockport.NewMockAuthServicer(t)
+	h := NewAuthHandler(svc)
+
+	// display_name max is 100, send 101+ chars
+	body := `{"display_name":"` + strings.Repeat("x", 101) + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/auth/me", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uuid.New()))
+	rec := httptest.NewRecorder()
+
+	h.UpdateProfile(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestAuthHandler_UpdateProfile_ServiceError(t *testing.T) {
+	svc := mockport.NewMockAuthServicer(t)
+	h := NewAuthHandler(svc)
+
+	uid := uuid.New()
+	svc.EXPECT().UpdateProfile(mock.Anything, uid, mock.Anything).Return(nil, domain.ErrNotFound)
+
+	body := `{"display_name":"Test"}`
+	req := httptest.NewRequest(http.MethodPut, "/auth/me", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	h.UpdateProfile(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+// --- GoogleRedirect & GoogleCallback ---
+
+func TestAuthHandler_GoogleRedirect_NotImplemented(t *testing.T) {
+	svc := mockport.NewMockAuthServicer(t)
+	h := NewAuthHandler(svc)
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/google", nil)
+	rec := httptest.NewRecorder()
+
+	h.GoogleRedirect(rec, req)
+	assert.Equal(t, http.StatusNotImplemented, rec.Code)
+}
+
+func TestAuthHandler_GoogleCallback_NotImplemented(t *testing.T) {
+	svc := mockport.NewMockAuthServicer(t)
+	h := NewAuthHandler(svc)
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/google/callback", nil)
+	rec := httptest.NewRecorder()
+
+	h.GoogleCallback(rec, req)
+	assert.Equal(t, http.StatusNotImplemented, rec.Code)
+}
+
 func userID() uuid.UUID {
 	return uuid.MustParse("11111111-1111-1111-1111-111111111111")
 }

@@ -160,6 +160,51 @@ func TestStudyHandler_GetSession_Forbidden(t *testing.T) {
 
 // --- SubmitReview ---
 
+func TestStudyHandler_SubmitReview_Success(t *testing.T) {
+	svc := mockport.NewMockStudyServicer(t)
+	h := NewStudyHandler(svc)
+	router := setupStudyRouter(h)
+
+	uid := uuid.New()
+	sessionID := uuid.New()
+	cardID := uuid.New()
+
+	svc.EXPECT().SubmitReview(mock.Anything, uid, sessionID, mock.Anything).Return(
+		&dto.ReviewResult{
+			Card:      domain.Card{ID: cardID},
+			ReviewLog: domain.ReviewLog{ID: uuid.New()},
+		}, nil,
+	)
+
+	body := `{"card_id":"` + cardID.String() + `","rating":3,"card":{"due":"2025-01-01T00:00:00Z","stability":1,"difficulty":5,"elapsed_days":0,"scheduled_days":1,"reps":1,"lapses":0,"state":1,"last_review":"2025-01-01T00:00:00Z"}}`
+	req := httptest.NewRequest(http.MethodPost, "/study/sessions/"+sessionID.String()+"/reviews", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestStudyHandler_SubmitReview_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStudyServicer(t)
+	h := NewStudyHandler(svc)
+	router := setupStudyRouter(h)
+
+	uid := uuid.New()
+	sessionID := uuid.New()
+	cardID := uuid.New()
+
+	svc.EXPECT().SubmitReview(mock.Anything, uid, sessionID, mock.Anything).Return(nil, domain.ErrSessionEnded)
+
+	body := `{"card_id":"` + cardID.String() + `","rating":3,"card":{"due":"2025-01-01T00:00:00Z","stability":1,"difficulty":5,"elapsed_days":0,"scheduled_days":1,"reps":1,"lapses":0,"state":1,"last_review":"2025-01-01T00:00:00Z"}}`
+	req := httptest.NewRequest(http.MethodPost, "/study/sessions/"+sessionID.String()+"/reviews", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
 func TestStudyHandler_SubmitReview_InvalidSessionID(t *testing.T) {
 	svc := mockport.NewMockStudyServicer(t)
 	h := NewStudyHandler(svc)
@@ -204,6 +249,63 @@ func TestStudyHandler_SubmitReview_ValidationError(t *testing.T) {
 }
 
 // --- BatchReview ---
+
+func TestStudyHandler_BatchReview_Success(t *testing.T) {
+	svc := mockport.NewMockStudyServicer(t)
+	h := NewStudyHandler(svc)
+	router := setupStudyRouter(h)
+
+	uid := uuid.New()
+	sessionID := uuid.New()
+	cardID := uuid.New()
+
+	svc.EXPECT().BatchReview(mock.Anything, uid, sessionID, mock.Anything).Return(
+		&dto.BatchReviewResult{Processed: 1, Errors: 0}, nil,
+	)
+
+	body := `{"reviews":[{"card_id":"` + cardID.String() + `","rating":3,"reviewed_at":"2025-06-01T12:00:00Z","card":{"due":"2025-01-01T00:00:00Z","stability":1,"difficulty":5,"elapsed_days":0,"scheduled_days":1,"reps":1,"lapses":0,"state":1,"last_review":"2025-01-01T00:00:00Z"}}]}`
+	req := httptest.NewRequest(http.MethodPost, "/study/sessions/"+sessionID.String()+"/reviews/batch", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestStudyHandler_BatchReview_ValidationError(t *testing.T) {
+	svc := mockport.NewMockStudyServicer(t)
+	h := NewStudyHandler(svc)
+	router := setupStudyRouter(h)
+
+	sessionID := uuid.New()
+	body := `{"reviews":[]}` // min=1
+	req := httptest.NewRequest(http.MethodPost, "/study/sessions/"+sessionID.String()+"/reviews/batch", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uuid.New()))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestStudyHandler_BatchReview_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStudyServicer(t)
+	h := NewStudyHandler(svc)
+	router := setupStudyRouter(h)
+
+	uid := uuid.New()
+	sessionID := uuid.New()
+	cardID := uuid.New()
+
+	svc.EXPECT().BatchReview(mock.Anything, uid, sessionID, mock.Anything).Return(nil, domain.ErrSessionEnded)
+
+	body := `{"reviews":[{"card_id":"` + cardID.String() + `","rating":3,"reviewed_at":"2025-06-01T12:00:00Z","card":{"due":"2025-01-01T00:00:00Z","stability":1,"difficulty":5,"elapsed_days":0,"scheduled_days":1,"reps":1,"lapses":0,"state":1,"last_review":"2025-01-01T00:00:00Z"}}]}`
+	req := httptest.NewRequest(http.MethodPost, "/study/sessions/"+sessionID.String()+"/reviews/batch", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
 
 func TestStudyHandler_BatchReview_InvalidSessionID(t *testing.T) {
 	svc := mockport.NewMockStudyServicer(t)

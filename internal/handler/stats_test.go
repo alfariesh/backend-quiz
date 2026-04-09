@@ -48,6 +48,22 @@ func TestStatsHandler_Overview_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
+func TestStatsHandler_Overview_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStatsServicer(t)
+	h := NewStatsHandler(svc)
+	router := setupStatsRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().Overview(mock.Anything, uid).Return(nil, domain.ErrNotFound)
+
+	req := httptest.NewRequest(http.MethodGet, "/stats/overview", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
 // --- Heatmap ---
 
 func TestStatsHandler_Heatmap_Success(t *testing.T) {
@@ -68,6 +84,22 @@ func TestStatsHandler_Heatmap_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
+func TestStatsHandler_Heatmap_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStatsServicer(t)
+	h := NewStatsHandler(svc)
+	router := setupStatsRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().Heatmap(mock.Anything, uid).Return(nil, domain.ErrNotFound)
+
+	req := httptest.NewRequest(http.MethodGet, "/stats/heatmap", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
 // --- Forecast ---
 
 func TestStatsHandler_Forecast_Success(t *testing.T) {
@@ -86,6 +118,22 @@ func TestStatsHandler_Forecast_Success(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestStatsHandler_Forecast_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStatsServicer(t)
+	h := NewStatsHandler(svc)
+	router := setupStatsRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().Forecast(mock.Anything, uid).Return(nil, domain.ErrNotFound)
+
+	req := httptest.NewRequest(http.MethodGet, "/stats/forecast", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
 // --- Leaderboard ---
@@ -195,6 +243,22 @@ func TestStatsHandler_Mastery_Empty(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "[]")
 }
 
+func TestStatsHandler_Mastery_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStatsServicer(t)
+	h := NewStatsHandler(svc)
+	router := setupStatsRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().Mastery(mock.Anything, uid).Return(nil, domain.ErrNotFound)
+
+	req := httptest.NewRequest(http.MethodGet, "/stats/mastery", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
 // --- WeakAreas ---
 
 func TestStatsHandler_WeakAreas_Success(t *testing.T) {
@@ -238,6 +302,36 @@ func TestStatsHandler_TestComparison_Success(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestStatsHandler_WeakAreas_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStatsServicer(t)
+	h := NewStatsHandler(svc)
+	router := setupStatsRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().WeakAreas(mock.Anything, uid).Return(nil, domain.ErrNotFound)
+
+	req := httptest.NewRequest(http.MethodGet, "/stats/weak-areas", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestStatsHandler_Leaderboard_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStatsServicer(t)
+	h := NewStatsHandler(svc)
+	router := setupStatsRouter(h)
+
+	svc.EXPECT().Leaderboard(mock.Anything, 20).Return(nil, domain.ErrNotFound)
+
+	req := httptest.NewRequest(http.MethodGet, "/stats/leaderboard", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
 func TestStatsHandler_TestComparison_InvalidDeckID(t *testing.T) {

@@ -72,7 +72,40 @@ func TestGoalHandler_SetGoal_ValidationError(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
+func TestGoalHandler_SetGoal_ServiceError(t *testing.T) {
+	svc := mockport.NewMockGoalServicer(t)
+	h := NewGoalHandler(svc)
+	router := setupGoalRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().SetGoal(mock.Anything, uid, mock.Anything).Return(nil, domain.ErrAlreadyExists)
+
+	body := `{"goal_type":"daily_reviews","target_value":50}`
+	req := httptest.NewRequest(http.MethodPost, "/goals", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusConflict, rec.Code)
+}
+
 // --- ListWithProgress ---
+
+func TestGoalHandler_ListWithProgress_ServiceError(t *testing.T) {
+	svc := mockport.NewMockGoalServicer(t)
+	h := NewGoalHandler(svc)
+	router := setupGoalRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().ListWithProgress(mock.Anything, uid).Return(nil, domain.ErrNotFound)
+
+	req := httptest.NewRequest(http.MethodGet, "/goals", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
 
 func TestGoalHandler_ListWithProgress_Success(t *testing.T) {
 	svc := mockport.NewMockGoalServicer(t)
