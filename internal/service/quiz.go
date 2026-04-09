@@ -24,6 +24,7 @@ type QuizService struct {
 	cardRepo    domain.CardRepository
 	deckRepo    domain.DeckRepository
 	reviewRepo  domain.ReviewRepository
+	uow         domain.UnitOfWork
 }
 
 func NewQuizService(
@@ -32,6 +33,7 @@ func NewQuizService(
 	cardRepo domain.CardRepository,
 	deckRepo domain.DeckRepository,
 	reviewRepo domain.ReviewRepository,
+	uow domain.UnitOfWork,
 ) *QuizService {
 	return &QuizService{
 		quizRepo:    quizRepo,
@@ -39,6 +41,7 @@ func NewQuizService(
 		cardRepo:    cardRepo,
 		deckRepo:    deckRepo,
 		reviewRepo:  reviewRepo,
+		uow:         uow,
 	}
 }
 
@@ -904,9 +907,6 @@ func (s *QuizService) SubmitAnswer(ctx context.Context, userID, attemptID uuid.U
 		PointsEarned: pointsEarned,
 		DurationMS:   req.DurationMS,
 	}
-	if err := s.attemptRepo.CreateAnswer(ctx, answer); err != nil {
-		return nil, err
-	}
 
 	// Update attempt counters
 	attempt.Score += pointsEarned
@@ -914,21 +914,32 @@ func (s *QuizService) SubmitAnswer(ctx context.Context, userID, attemptID uuid.U
 	if isCorrect {
 		attempt.CorrectCount++
 	}
-	if err := s.attemptRepo.Update(ctx, attempt); err != nil {
-		return nil, err
-	}
 
 	result := &AnswerResult{
-		Answer:        *answer,
 		IsCorrect:     isCorrect,
 		Explanation:   question.Explanation,
 		CorrectAnswer: question.CorrectAnswer,
 	}
 
-	// FSRS integration: update linked card if client provided pre-computed state
-	if question.CardID != nil && req.FSRSCard != nil {
-		s.applyFSRSFromQuiz(ctx, userID, *question.CardID, req, result)
+	if err := s.uow.Do(ctx, func(ctx context.Context) error {
+		if err := s.attemptRepo.CreateAnswer(ctx, answer); err != nil {
+			return err
+		}
+		if err := s.attemptRepo.Update(ctx, attempt); err != nil {
+			return err
+		}
+
+		// FSRS integration: update linked card if client provided pre-computed state
+		if question.CardID != nil && req.FSRSCard != nil {
+			s.applyFSRSFromQuiz(ctx, userID, *question.CardID, req, result)
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
 	}
+
+	result.Answer = *answer
 
 	return result, nil
 }

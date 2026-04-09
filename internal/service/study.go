@@ -188,61 +188,63 @@ func (s *StudyService) BatchReview(ctx context.Context, userID uuid.UUID, sessio
 	processed, errCount := 0, 0
 	newInc, reviewInc, relearnInc, totalDuration := 0, 0, 0, 0
 
-	for _, item := range req.Reviews {
-		if err := validateFSRSState(item.Card); err != nil {
-			errCount++
-			continue
+	if err := s.uow.Do(ctx, func(ctx context.Context) error {
+		for _, item := range req.Reviews {
+			if err := validateFSRSState(item.Card); err != nil {
+				errCount++
+				continue
+			}
+
+			card, err := s.cardRepo.GetByID(ctx, item.CardID)
+			if err != nil || card.IsSuspended {
+				errCount++
+				continue
+			}
+
+			stateBefore := card.State
+
+			applyFSRSCardState(card, item.Card)
+			if err := s.cardRepo.UpdateFSRS(ctx, card); err != nil {
+				errCount++
+				continue
+			}
+
+			reviewLog := &domain.ReviewLog{
+				CardID:        card.ID,
+				UserID:        userID,
+				Rating:        domain.Rating(item.Rating),
+				State:         stateBefore,
+				ScheduledDays: item.Log.ScheduledDays,
+				ElapsedDays:   item.Log.ElapsedDays,
+				Stability:     item.Log.Stability,
+				Difficulty:    item.Log.Difficulty,
+				DurationMS:    item.DurationMS,
+				Source:        domain.ReviewSourceFlashcard,
+				ReviewedAt:    item.ReviewedAt,
+			}
+			if err := s.reviewRepo.Create(ctx, reviewLog); err != nil {
+				errCount++
+				continue
+			}
+
+			switch stateBefore {
+			case domain.CardStateNew:
+				newInc++
+			case domain.CardStateReview, domain.CardStateLearning:
+				reviewInc++
+			case domain.CardStateRelearning:
+				relearnInc++
+			}
+			totalDuration += item.DurationMS
+			processed++
 		}
 
-		card, err := s.cardRepo.GetByID(ctx, item.CardID)
-		if err != nil || card.IsSuspended {
-			errCount++
-			continue
-		}
-
-		stateBefore := card.State
-
-		applyFSRSCardState(card, item.Card)
-		if err := s.cardRepo.UpdateFSRS(ctx, card); err != nil {
-			errCount++
-			continue
-		}
-
-		reviewLog := &domain.ReviewLog{
-			CardID:        card.ID,
-			UserID:        userID,
-			Rating:        domain.Rating(item.Rating),
-			State:         stateBefore,
-			ScheduledDays: item.Log.ScheduledDays,
-			ElapsedDays:   item.Log.ElapsedDays,
-			Stability:     item.Log.Stability,
-			Difficulty:    item.Log.Difficulty,
-			DurationMS:    item.DurationMS,
-			Source:        domain.ReviewSourceFlashcard,
-			ReviewedAt:    item.ReviewedAt,
-		}
-		if err := s.reviewRepo.Create(ctx, reviewLog); err != nil {
-			errCount++
-			continue
-		}
-
-		switch stateBefore {
-		case domain.CardStateNew:
-			newInc++
-		case domain.CardStateReview, domain.CardStateLearning:
-			reviewInc++
-		case domain.CardStateRelearning:
-			relearnInc++
-		}
-		totalDuration += item.DurationMS
-		processed++
-	}
-
-	session.NewCount += newInc
-	session.ReviewCount += reviewInc
-	session.RelearnCount += relearnInc
-	session.TotalDurationMS += totalDuration
-	if err := s.sessionRepo.Update(ctx, session); err != nil {
+		session.NewCount += newInc
+		session.ReviewCount += reviewInc
+		session.RelearnCount += relearnInc
+		session.TotalDurationMS += totalDuration
+		return s.sessionRepo.Update(ctx, session)
+	}); err != nil {
 		return nil, err
 	}
 

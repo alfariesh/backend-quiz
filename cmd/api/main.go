@@ -87,7 +87,7 @@ func run() error {
 	cardSvc := service.NewCardService(cardRepo, deckRepo)
 	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo, uow)
 	statsSvc := service.NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, quizAttemptRepo)
-	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo, reviewRepo)
+	quizSvc := service.NewQuizService(quizRepo, quizAttemptRepo, cardRepo, deckRepo, reviewRepo, uow)
 
 	r2Client := storage.NewR2Client(cfg.R2.AccountID, cfg.R2.AccessKeyID, cfg.R2.SecretAccessKey, cfg.R2.BucketName, cfg.R2.PublicURL)
 	mediaSvc := service.NewMediaService(mediaRepo, cardRepo, deckRepo, r2Client, cfg.R2)

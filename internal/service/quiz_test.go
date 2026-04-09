@@ -503,7 +503,7 @@ func TestQuizService_CreateQuiz_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -526,7 +526,7 @@ func TestQuizService_CreateQuiz_WithDeck(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 	userID := uuid.New()
 	deckID := uuid.New()
@@ -553,7 +553,7 @@ func TestQuizService_CreateQuiz_DeckForbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -573,7 +573,7 @@ func TestQuizService_GetQuiz_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -597,7 +597,7 @@ func TestQuizService_GetQuiz_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -615,7 +615,7 @@ func TestQuizService_ListQuizzes_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -637,7 +637,7 @@ func TestQuizService_UpdateQuiz_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -668,7 +668,7 @@ func TestQuizService_UpdateQuiz_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -687,7 +687,7 @@ func TestQuizService_DeleteQuiz_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -706,7 +706,7 @@ func TestQuizService_DeleteQuiz_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -724,7 +724,7 @@ func TestQuizService_AddQuestion_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -754,7 +754,7 @@ func TestQuizService_AddQuestion_DefaultPoints(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -780,7 +780,7 @@ func TestQuizService_AddQuestion_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -798,7 +798,7 @@ func TestQuizService_AddQuestion_InvalidOptions(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -823,7 +823,7 @@ func TestQuizService_BatchAddQuestions_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -852,7 +852,7 @@ func TestQuizService_BatchAddQuestions_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -870,7 +870,7 @@ func TestQuizService_BatchAddQuestions_ValidationError(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -897,7 +897,7 @@ func TestQuizService_UpdateQuestion_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -932,7 +932,7 @@ func TestQuizService_UpdateQuestion_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -949,7 +949,7 @@ func TestQuizService_UpdateQuestion_NotInQuiz(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -974,7 +974,7 @@ func TestQuizService_DeleteQuestion_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -995,7 +995,7 @@ func TestQuizService_DeleteQuestion_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -1011,7 +1011,7 @@ func TestQuizService_DeleteQuestion_NotInQuiz(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1033,7 +1033,7 @@ func TestQuizService_GenerateFromDeck_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1073,7 +1073,7 @@ func TestQuizService_GenerateFromDeck_InsufficientCards(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1098,7 +1098,7 @@ func TestQuizService_GenerateFromDeck_MCQNeed4Cards(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1125,7 +1125,7 @@ func TestQuizService_GenerateFromDeck_DeckForbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1149,7 +1149,7 @@ func TestQuizService_GenerateAyatQuiz_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1187,7 +1187,7 @@ func TestQuizService_GenerateAyatQuiz_InsufficientAyatCards(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1215,7 +1215,7 @@ func TestQuizService_StartAttempt_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1247,7 +1247,7 @@ func TestQuizService_StartAttempt_PublishedQuiz(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	otherUserID := uuid.New()
@@ -1271,7 +1271,7 @@ func TestQuizService_StartAttempt_NotPublished(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -1289,7 +1289,7 @@ func TestQuizService_StartAttempt_MCQStripsIsCorrect(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1327,7 +1327,7 @@ func TestQuizService_SubmitAnswer_Correct(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1367,7 +1367,7 @@ func TestQuizService_SubmitAnswer_Wrong(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1402,7 +1402,7 @@ func TestQuizService_SubmitAnswer_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	attemptID := uuid.New()
@@ -1420,7 +1420,7 @@ func TestQuizService_SubmitAnswer_AttemptCompleted(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1441,7 +1441,7 @@ func TestQuizService_SubmitAnswer_QuestionNotInQuiz(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1466,7 +1466,7 @@ func TestQuizService_SubmitAnswer_AlreadyAnswered(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1492,7 +1492,7 @@ func TestQuizService_SubmitAnswer_WithFSRS(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1545,7 +1545,7 @@ func TestQuizService_CompleteAttempt_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1569,7 +1569,7 @@ func TestQuizService_CompleteAttempt_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	attemptID := uuid.New()
@@ -1587,7 +1587,7 @@ func TestQuizService_CompleteAttempt_AlreadyCompleted(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1610,7 +1610,7 @@ func TestQuizService_GetAttempt_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1641,7 +1641,7 @@ func TestQuizService_GetAttempt_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	attemptID := uuid.New()
@@ -1661,7 +1661,7 @@ func TestQuizService_ListAttempts_Success(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -1685,7 +1685,7 @@ func TestQuizService_ListAttempts_Forbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -1983,7 +1983,7 @@ func TestQuizService_UpdateQuiz_AllFields(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2023,7 +2023,7 @@ func TestQuizService_UpdateQuiz_NotFound(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -2042,7 +2042,7 @@ func TestQuizService_UpdateQuestion_AllFields(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2088,7 +2088,7 @@ func TestQuizService_GetQuiz_ListQuestionsError(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2107,7 +2107,7 @@ func TestQuizService_GetQuiz_NotFound(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -2125,7 +2125,7 @@ func TestQuizService_CreateQuiz_DeckNotFound(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -2145,7 +2145,7 @@ func TestQuizService_DeleteQuiz_NotFound(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -2163,7 +2163,7 @@ func TestQuizService_BatchAddQuestions_CountError(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2188,7 +2188,7 @@ func TestQuizService_GenerateFromDeck_MixedType(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2228,7 +2228,7 @@ func TestQuizService_GenerateFromDeck_TrueFalseType(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2266,7 +2266,7 @@ func TestQuizService_GenerateFromDeck_MCQType(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2305,7 +2305,7 @@ func TestQuizService_GenerateFromDeck_CountExceedsCards(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2343,7 +2343,7 @@ func TestQuizService_GenerateAyatQuiz_MixedAyat(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2384,7 +2384,7 @@ func TestQuizService_GenerateAyatQuiz_ContinuationType(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2422,7 +2422,7 @@ func TestQuizService_GenerateAyatQuiz_DeckForbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2444,7 +2444,7 @@ func TestQuizService_GenerateAyatQuiz_QuizForbidden(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -2466,7 +2466,7 @@ func TestQuizService_SubmitAnswer_FSRS_SuspendedCard(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2509,7 +2509,7 @@ func TestQuizService_SubmitAnswer_FSRS_DefaultRatingIncorrect(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2555,7 +2555,7 @@ func TestQuizService_StartAttempt_WithShuffle(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2586,7 +2586,7 @@ func TestQuizService_GetAttempt_ListAnswersError(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -2609,7 +2609,7 @@ func TestQuizService_ListAttempts_QuizNotFound(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	quizID := uuid.New()
@@ -2627,7 +2627,7 @@ func TestQuizService_AddQuestion_CountError(t *testing.T) {
 	cardRepo := mockdomain.NewMockCardRepository(t)
 	deckRepo := mockdomain.NewMockDeckRepository(t)
 	reviewRepo := mockdomain.NewMockReviewRepository(t)
-	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo)
+	svc := NewQuizService(quizRepo, attemptRepo, cardRepo, deckRepo, reviewRepo, noopUoW{})
 	ctx := context.Background()
 
 	userID := uuid.New()
