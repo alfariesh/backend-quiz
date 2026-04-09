@@ -35,6 +35,14 @@ func JSONError(w http.ResponseWriter, status int, message string) {
 }
 
 func HandleError(w http.ResponseWriter, err error) {
+	// Try structured AppError first
+	var appErr *domain.AppError
+	if errors.As(err, &appErr) {
+		JSONError(w, codeToHTTPStatus(appErr.Code), appErr.Message)
+		return
+	}
+
+	// Fallback to sentinel matching
 	switch {
 	case errors.Is(err, domain.ErrNotFound):
 		JSONError(w, http.StatusNotFound, err.Error())
@@ -62,6 +70,25 @@ func HandleError(w http.ResponseWriter, err error) {
 		JSONError(w, http.StatusTooManyRequests, err.Error())
 	default:
 		JSONError(w, http.StatusInternalServerError, "internal server error")
+	}
+}
+
+func codeToHTTPStatus(code domain.ErrorCode) int {
+	switch code {
+	case domain.CodeNotFound:
+		return http.StatusNotFound
+	case domain.CodeAlreadyExists, domain.CodeConflict:
+		return http.StatusConflict
+	case domain.CodeUnauthorized, domain.CodeInvalidCredentials:
+		return http.StatusUnauthorized
+	case domain.CodeForbidden:
+		return http.StatusForbidden
+	case domain.CodeInvalidInput:
+		return http.StatusBadRequest
+	case domain.CodeTooManyRequests:
+		return http.StatusTooManyRequests
+	default:
+		return http.StatusInternalServerError
 	}
 }
 

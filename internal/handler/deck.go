@@ -6,24 +6,25 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
-	"github.com/rekanesiads/backend-quiz/internal/service"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 	"github.com/rekanesiads/backend-quiz/pkg/pagination"
 	"github.com/rekanesiads/backend-quiz/pkg/validate"
 )
 
 type DeckHandler struct {
-	deckSvc *service.DeckService
+	deckSvc port.DeckServicer
 }
 
-func NewDeckHandler(deckSvc *service.DeckService) *DeckHandler {
+func NewDeckHandler(deckSvc port.DeckServicer) *DeckHandler {
 	return &DeckHandler{deckSvc: deckSvc}
 }
 
 func (h *DeckHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 
-	var req service.CreateDeckRequest
+	var req dto.CreateDeckRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -77,7 +78,7 @@ func (h *DeckHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.UpdateDeckRequest
+	var req dto.UpdateDeckRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -114,7 +115,7 @@ func (h *DeckHandler) Share(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.ShareDeckRequest
+	var req dto.ShareDeckRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -190,7 +191,7 @@ func (h *DeckHandler) Export(w http.ResponseWriter, r *http.Request) {
 func (h *DeckHandler) Import(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 
-	var req service.ImportDeckRequest
+	var req dto.ImportDeckRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return

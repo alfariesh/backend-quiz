@@ -21,7 +21,7 @@ func NewQuizRepository(pool *pgxpool.Pool) *QuizRepository {
 }
 
 func (r *QuizRepository) Create(ctx context.Context, quiz *domain.Quiz) error {
-	result, err := r.q.CreateQuiz(ctx, sqlc.CreateQuizParams{
+	result, err := querier(r.q, ctx).CreateQuiz(ctx, sqlc.CreateQuizParams{
 		UserID:           quiz.UserID,
 		DeckID:           uuidToNullable(quiz.DeckID),
 		Title:            quiz.Title,
@@ -38,7 +38,7 @@ func (r *QuizRepository) Create(ctx context.Context, quiz *domain.Quiz) error {
 }
 
 func (r *QuizRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Quiz, error) {
-	result, err := r.q.GetQuizByID(ctx, id)
+	result, err := querier(r.q, ctx).GetQuizByID(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -50,7 +50,7 @@ func (r *QuizRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Qui
 }
 
 func (r *QuizRepository) ListByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.QuizWithCounts, int, error) {
-	rows, err := r.q.ListQuizzesByUserID(ctx, sqlc.ListQuizzesByUserIDParams{
+	rows, err := querier(r.q, ctx).ListQuizzesByUserID(ctx, sqlc.ListQuizzesByUserIDParams{
 		UserID: userID,
 		Limit:  int32(limit),
 		Offset: int32(offset),
@@ -59,7 +59,7 @@ func (r *QuizRepository) ListByUserID(ctx context.Context, userID uuid.UUID, lim
 		return nil, 0, err
 	}
 
-	total, err := r.q.CountQuizzesByUserID(ctx, userID)
+	total, err := querier(r.q, ctx).CountQuizzesByUserID(ctx, userID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -88,7 +88,7 @@ func (r *QuizRepository) ListByUserID(ctx context.Context, userID uuid.UUID, lim
 }
 
 func (r *QuizRepository) Update(ctx context.Context, quiz *domain.Quiz) error {
-	return r.q.UpdateQuiz(ctx, sqlc.UpdateQuizParams{
+	return querier(r.q, ctx).UpdateQuiz(ctx, sqlc.UpdateQuizParams{
 		ID:               quiz.ID,
 		Title:            quiz.Title,
 		Description:      quiz.Description,
@@ -100,13 +100,13 @@ func (r *QuizRepository) Update(ctx context.Context, quiz *domain.Quiz) error {
 }
 
 func (r *QuizRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.q.DeleteQuiz(ctx, id)
+	return querier(r.q, ctx).DeleteQuiz(ctx, id)
 }
 
 // Question operations
 
 func (r *QuizRepository) CreateQuestion(ctx context.Context, q *domain.QuizQuestion) error {
-	result, err := r.q.CreateQuizQuestion(ctx, sqlc.CreateQuizQuestionParams{
+	result, err := querier(r.q, ctx).CreateQuizQuestion(ctx, sqlc.CreateQuizQuestionParams{
 		QuizID:        q.QuizID,
 		CardID:        uuidToNullable(q.CardID),
 		QuestionType:  q.QuestionType,
@@ -125,15 +125,17 @@ func (r *QuizRepository) CreateQuestion(ctx context.Context, q *domain.QuizQuest
 }
 
 func (r *QuizRepository) BulkCreateQuestions(ctx context.Context, questions []*domain.QuizQuestion) error {
-	tx, err := r.pool.Begin(ctx)
+	ctx, tx, isOwner, err := beginOrJoin(ctx, r.pool)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	if isOwner {
+		defer tx.Rollback(ctx)
+	}
 
-	qtx := r.q.WithTx(tx)
+	qr := querier(r.q, ctx)
 	for _, q := range questions {
-		result, err := qtx.CreateQuizQuestion(ctx, sqlc.CreateQuizQuestionParams{
+		result, err := qr.CreateQuizQuestion(ctx, sqlc.CreateQuizQuestionParams{
 			QuizID:        q.QuizID,
 			CardID:        uuidToNullable(q.CardID),
 			QuestionType:  q.QuestionType,
@@ -150,11 +152,14 @@ func (r *QuizRepository) BulkCreateQuestions(ctx context.Context, questions []*d
 		*q = questionFromSqlc(result)
 	}
 
-	return tx.Commit(ctx)
+	if isOwner {
+		return tx.Commit(ctx)
+	}
+	return nil
 }
 
 func (r *QuizRepository) GetQuestionByID(ctx context.Context, id uuid.UUID) (*domain.QuizQuestion, error) {
-	result, err := r.q.GetQuizQuestionByID(ctx, id)
+	result, err := querier(r.q, ctx).GetQuizQuestionByID(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -166,7 +171,7 @@ func (r *QuizRepository) GetQuestionByID(ctx context.Context, id uuid.UUID) (*do
 }
 
 func (r *QuizRepository) ListQuestionsByQuizID(ctx context.Context, quizID uuid.UUID) ([]domain.QuizQuestion, error) {
-	rows, err := r.q.ListQuizQuestionsByQuizID(ctx, quizID)
+	rows, err := querier(r.q, ctx).ListQuizQuestionsByQuizID(ctx, quizID)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +183,7 @@ func (r *QuizRepository) ListQuestionsByQuizID(ctx context.Context, quizID uuid.
 }
 
 func (r *QuizRepository) UpdateQuestion(ctx context.Context, q *domain.QuizQuestion) error {
-	return r.q.UpdateQuizQuestion(ctx, sqlc.UpdateQuizQuestionParams{
+	return querier(r.q, ctx).UpdateQuizQuestion(ctx, sqlc.UpdateQuizQuestionParams{
 		ID:            q.ID,
 		QuestionType:  q.QuestionType,
 		QuestionText:  q.QuestionText,
@@ -191,16 +196,16 @@ func (r *QuizRepository) UpdateQuestion(ctx context.Context, q *domain.QuizQuest
 }
 
 func (r *QuizRepository) DeleteQuestion(ctx context.Context, id uuid.UUID) error {
-	return r.q.DeleteQuizQuestion(ctx, id)
+	return querier(r.q, ctx).DeleteQuizQuestion(ctx, id)
 }
 
 func (r *QuizRepository) CountQuestionsByQuizID(ctx context.Context, quizID uuid.UUID) (int, error) {
-	count, err := r.q.CountQuizQuestionsByQuizID(ctx, quizID)
+	count, err := querier(r.q, ctx).CountQuizQuestionsByQuizID(ctx, quizID)
 	return int(count), err
 }
 
 func (r *QuizRepository) ListByDeckAndType(ctx context.Context, deckID uuid.UUID, quizType string) ([]domain.Quiz, error) {
-	rows, err := r.q.ListQuizzesByDeckAndType(ctx, sqlc.ListQuizzesByDeckAndTypeParams{
+	rows, err := querier(r.q, ctx).ListQuizzesByDeckAndType(ctx, sqlc.ListQuizzesByDeckAndTypeParams{
 		DeckID:   uuidToNullable(&deckID),
 		QuizType: quizType,
 	})

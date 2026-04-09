@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 
@@ -11,7 +10,8 @@ import (
 
 	"github.com/rekanesiads/backend-quiz/config"
 	"github.com/rekanesiads/backend-quiz/internal/domain"
-	"github.com/rekanesiads/backend-quiz/pkg/storage"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 )
 
 var allowedMediaTypes = map[string]bool{
@@ -29,11 +29,13 @@ var allowedMediaTypes = map[string]bool{
 	"image/svg+xml": true,
 }
 
+var _ port.MediaServicer = (*MediaService)(nil)
+
 type MediaService struct {
 	mediaRepo domain.MediaRepository
 	cardRepo  domain.CardRepository
 	deckRepo  domain.DeckRepository
-	r2        *storage.R2Client
+	store     domain.ObjectStore
 	r2Config  config.R2Config
 }
 
@@ -41,24 +43,19 @@ func NewMediaService(
 	mediaRepo domain.MediaRepository,
 	cardRepo domain.CardRepository,
 	deckRepo domain.DeckRepository,
-	r2 *storage.R2Client,
+	store domain.ObjectStore,
 	r2Config config.R2Config,
 ) *MediaService {
 	return &MediaService{
 		mediaRepo: mediaRepo,
 		cardRepo:  cardRepo,
 		deckRepo:  deckRepo,
-		r2:        r2,
+		store:     store,
 		r2Config:  r2Config,
 	}
 }
 
-type UploadMediaRequest struct {
-	FileName    string
-	FileSize    int
-	ContentType string
-	Body        io.Reader
-}
+type UploadMediaRequest = dto.UploadMediaRequest
 
 func (s *MediaService) Upload(ctx context.Context, userID, cardID uuid.UUID, req UploadMediaRequest) (*domain.Media, error) {
 	// Validate card ownership
@@ -98,7 +95,7 @@ func (s *MediaService) Upload(ctx context.Context, userID, cardID uuid.UUID, req
 	r2Key := fmt.Sprintf("media/%s/%s%s", userID.String(), fileID.String(), ext)
 
 	// Upload to R2
-	url, err := s.r2.Upload(ctx, r2Key, req.Body, req.ContentType)
+	url, err := s.store.Upload(ctx, r2Key, req.Body, req.ContentType)
 	if err != nil {
 		return nil, fmt.Errorf("uploading file: %w", err)
 	}
@@ -115,7 +112,7 @@ func (s *MediaService) Upload(ctx context.Context, userID, cardID uuid.UUID, req
 	}
 	if err := s.mediaRepo.Create(ctx, media); err != nil {
 		// Clean up R2 on DB failure
-		_ = s.r2.Delete(ctx, r2Key)
+		_ = s.store.Delete(ctx, r2Key)
 		return nil, err
 	}
 
@@ -132,7 +129,7 @@ func (s *MediaService) Delete(ctx context.Context, userID, mediaID uuid.UUID) er
 	}
 
 	// Delete from R2
-	if err := s.r2.Delete(ctx, media.R2Key); err != nil {
+	if err := s.store.Delete(ctx, media.R2Key); err != nil {
 		return fmt.Errorf("deleting file: %w", err)
 	}
 

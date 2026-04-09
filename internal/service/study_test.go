@@ -11,12 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
 )
 
-
-func newTestStudyService(cardRepo *mockCardRepo, reviewRepo *mockReviewRepo, sessionRepo *mockSessionRepo, userRepo *mockUserRepo) *StudyService {
-	return NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, new(mockStatsRepo))
-}
 
 // --- validateFSRSState ---
 
@@ -308,8 +305,12 @@ func studyTestSession(userID uuid.UUID, deckID *uuid.UUID) *domain.StudySession 
 // --- StartSession ---
 
 func TestStudyService_StartSession_Success(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	user := studyTestUser()
@@ -330,12 +331,16 @@ func TestStudyService_StartSession_Success(t *testing.T) {
 	assert.Equal(t, 1, resp.Counts.New)
 	assert.Equal(t, 1, resp.Counts.Review)
 	assert.Equal(t, 2, resp.Counts.Total)
-	sessionRepo.AssertExpectations(t)
+
 }
 
 func TestStudyService_StartSession_UserNotFound(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -348,8 +353,12 @@ func TestStudyService_StartSession_UserNotFound(t *testing.T) {
 // --- GetSession ---
 
 func TestStudyService_GetSession_Success(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -365,8 +374,12 @@ func TestStudyService_GetSession_Success(t *testing.T) {
 }
 
 func TestStudyService_GetSession_Forbidden(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -381,8 +394,12 @@ func TestStudyService_GetSession_Forbidden(t *testing.T) {
 // --- SubmitReview ---
 
 func TestStudyService_SubmitReview_Success(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -414,12 +431,16 @@ func TestStudyService_SubmitReview_Success(t *testing.T) {
 	assert.Equal(t, domain.ReviewSourceFlashcard, result.ReviewLog.Source)
 	assert.Equal(t, domain.CardStateNew, result.ReviewLog.State) // state before
 	assert.Equal(t, 1, session.NewCount)                         // incremented
-	cardRepo.AssertExpectations(t)
+
 }
 
 func TestStudyService_SubmitReview_SessionEnded(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -434,8 +455,12 @@ func TestStudyService_SubmitReview_SessionEnded(t *testing.T) {
 }
 
 func TestStudyService_SubmitReview_CardSuspended(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -452,8 +477,12 @@ func TestStudyService_SubmitReview_CardSuspended(t *testing.T) {
 }
 
 func TestStudyService_SubmitReview_InvalidFSRS(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -475,8 +504,12 @@ func TestStudyService_SubmitReview_InvalidFSRS(t *testing.T) {
 // --- BatchReview ---
 
 func TestStudyService_BatchReview_Success(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -513,8 +546,12 @@ func TestStudyService_BatchReview_Success(t *testing.T) {
 }
 
 func TestStudyService_BatchReview_PartialErrors(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -550,8 +587,12 @@ func TestStudyService_BatchReview_PartialErrors(t *testing.T) {
 }
 
 func TestStudyService_BatchReview_SessionEnded(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -568,8 +609,12 @@ func TestStudyService_BatchReview_SessionEnded(t *testing.T) {
 }
 
 func TestStudyService_BatchReview_Forbidden(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -584,8 +629,12 @@ func TestStudyService_BatchReview_Forbidden(t *testing.T) {
 }
 
 func TestStudyService_BatchReview_SkipsSuspendedCards(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -617,8 +666,12 @@ func TestStudyService_BatchReview_SkipsSuspendedCards(t *testing.T) {
 // --- EndSession ---
 
 func TestStudyService_EndSession_Success(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -635,8 +688,12 @@ func TestStudyService_EndSession_Success(t *testing.T) {
 }
 
 func TestStudyService_EndSession_AlreadyEnded(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -651,8 +708,12 @@ func TestStudyService_EndSession_AlreadyEnded(t *testing.T) {
 }
 
 func TestStudyService_EndSession_Forbidden(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -667,8 +728,12 @@ func TestStudyService_EndSession_Forbidden(t *testing.T) {
 // --- GetReminders ---
 
 func TestStudyService_GetReminders_Success(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -684,8 +749,6 @@ func TestStudyService_GetReminders_Success(t *testing.T) {
 	cardRepo.On("GetNextDueAt", ctx, userID, mock.AnythingOfType("time.Time")).Return(&nextDue, nil)
 	reviewRepo.On("CountByUserAndDate", ctx, userID, mock.AnythingOfType("time.Time")).Return(5, nil)
 
-	// Access statsRepo from the service's internal field via mock setup
-	statsRepo := svc.statsRepo.(*mockStatsRepo)
 	statsRepo.On("GetStreak", ctx, userID).Return(7, nil)
 
 	result, err := svc.GetReminders(ctx, userID, 24)
@@ -700,8 +763,12 @@ func TestStudyService_GetReminders_Success(t *testing.T) {
 }
 
 func TestStudyService_GetReminders_NoStudyToday(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -709,7 +776,6 @@ func TestStudyService_GetReminders_NoStudyToday(t *testing.T) {
 	cardRepo.On("GetNextDueAt", ctx, userID, mock.AnythingOfType("time.Time")).Return((*time.Time)(nil), nil)
 	reviewRepo.On("CountByUserAndDate", ctx, userID, mock.AnythingOfType("time.Time")).Return(0, nil)
 
-	statsRepo := svc.statsRepo.(*mockStatsRepo)
 	statsRepo.On("GetStreak", ctx, userID).Return(0, nil)
 
 	result, err := svc.GetReminders(ctx, userID, 12)
@@ -723,8 +789,12 @@ func TestStudyService_GetReminders_NoStudyToday(t *testing.T) {
 }
 
 func TestStudyService_GetReminders_DueSummaryError(t *testing.T) {
-	cardRepo, reviewRepo, sessionRepo, userRepo := new(mockCardRepo), new(mockReviewRepo), new(mockSessionRepo), new(mockUserRepo)
-	svc := newTestStudyService(cardRepo, reviewRepo, sessionRepo, userRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	sessionRepo := mockdomain.NewMockStudySessionRepository(t)
+	userRepo := mockdomain.NewMockUserRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	svc := NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 

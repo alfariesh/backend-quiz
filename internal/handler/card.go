@@ -8,17 +8,18 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
-	"github.com/rekanesiads/backend-quiz/internal/service"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 	"github.com/rekanesiads/backend-quiz/pkg/pagination"
 	"github.com/rekanesiads/backend-quiz/pkg/validate"
 )
 
 type CardHandler struct {
-	cardSvc *service.CardService
+	cardSvc port.CardServicer
 }
 
-func NewCardHandler(cardSvc *service.CardService) *CardHandler {
+func NewCardHandler(cardSvc port.CardServicer) *CardHandler {
 	return &CardHandler{cardSvc: cardSvc}
 }
 
@@ -30,7 +31,7 @@ func (h *CardHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.CreateCardRequest
+	var req dto.CreateCardRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -56,7 +57,7 @@ func (h *CardHandler) BatchCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.BatchCreateRequest
+	var req dto.BatchCreateRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -126,7 +127,7 @@ func (h *CardHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.UpdateCardRequest
+	var req dto.UpdateCardRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -179,7 +180,7 @@ func (h *CardHandler) Suspend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.SuspendRequest
+	var req dto.SuspendRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return

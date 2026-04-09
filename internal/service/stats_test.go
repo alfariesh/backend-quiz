@@ -11,19 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
 )
 
-func newTestStatsService(
-	reviewRepo *mockReviewRepo,
-	sessionRepo *mockSessionRepo,
-	statsRepo *mockStatsRepo,
-	cardRepo *mockCardRepo,
-	deckRepo *mockDeckRepo,
-	quizRepo *mockQuizRepo,
-	attemptRepo *mockQuizAttemptRepo,
-) *StatsService {
-	return NewStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
-}
 
 func TestMasteryLevel(t *testing.T) {
 	tests := []struct {
@@ -69,8 +59,13 @@ func TestMasteryLevel(t *testing.T) {
 // --- Overview ---
 
 func TestStatsService_Overview_Success(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -91,8 +86,13 @@ func TestStatsService_Overview_Success(t *testing.T) {
 }
 
 func TestStatsService_Overview_NoData(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -112,8 +112,13 @@ func TestStatsService_Overview_NoData(t *testing.T) {
 // --- Heatmap ---
 
 func TestStatsService_Heatmap_Success(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -133,8 +138,13 @@ func TestStatsService_Heatmap_Success(t *testing.T) {
 }
 
 func TestStatsService_Heatmap_Error(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -147,8 +157,13 @@ func TestStatsService_Heatmap_Error(t *testing.T) {
 // --- Forecast ---
 
 func TestStatsService_Forecast_Returns30Days(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -162,8 +177,13 @@ func TestStatsService_Forecast_Returns30Days(t *testing.T) {
 // --- Leaderboard ---
 
 func TestStatsService_Leaderboard_Success(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 
 	entries := []domain.LeaderboardEntry{
@@ -180,8 +200,13 @@ func TestStatsService_Leaderboard_Success(t *testing.T) {
 }
 
 func TestStatsService_Leaderboard_DefaultLimit(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 
 	statsRepo.On("GetGlobalLeaderboard", ctx, 20).Return([]domain.LeaderboardEntry{}, nil)
@@ -195,8 +220,13 @@ func TestStatsService_Leaderboard_DefaultLimit(t *testing.T) {
 // --- DeckStats ---
 
 func TestStatsService_DeckStats_Success(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -220,8 +250,13 @@ func TestStatsService_DeckStats_Success(t *testing.T) {
 }
 
 func TestStatsService_DeckStats_CountByStateError(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -234,8 +269,13 @@ func TestStatsService_DeckStats_CountByStateError(t *testing.T) {
 // --- Mastery ---
 
 func TestStatsService_Mastery_Success(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -264,8 +304,13 @@ func TestStatsService_Mastery_Success(t *testing.T) {
 }
 
 func TestStatsService_Mastery_SkipsEmptyDecks(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -283,8 +328,13 @@ func TestStatsService_Mastery_SkipsEmptyDecks(t *testing.T) {
 }
 
 func TestStatsService_Mastery_NoDecks(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -299,8 +349,13 @@ func TestStatsService_Mastery_NoDecks(t *testing.T) {
 // --- WeakAreas ---
 
 func TestStatsService_WeakAreas_Success(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -335,8 +390,13 @@ func TestStatsService_WeakAreas_Success(t *testing.T) {
 }
 
 func TestStatsService_WeakAreas_Empty(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -350,8 +410,13 @@ func TestStatsService_WeakAreas_Empty(t *testing.T) {
 }
 
 func TestStatsService_WeakAreas_CapsAt20Cards(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -369,8 +434,13 @@ func TestStatsService_WeakAreas_CapsAt20Cards(t *testing.T) {
 }
 
 func TestStatsService_WeakAreas_Error(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -383,8 +453,13 @@ func TestStatsService_WeakAreas_Error(t *testing.T) {
 // --- TestComparison ---
 
 func TestStatsService_TestComparison_WithImprovement(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -427,8 +502,13 @@ func TestStatsService_TestComparison_WithImprovement(t *testing.T) {
 }
 
 func TestStatsService_TestComparison_NoTests(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -447,8 +527,13 @@ func TestStatsService_TestComparison_NoTests(t *testing.T) {
 }
 
 func TestStatsService_TestComparison_Forbidden(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 
 	deckID := uuid.New()
@@ -459,8 +544,13 @@ func TestStatsService_TestComparison_Forbidden(t *testing.T) {
 }
 
 func TestStatsService_TestComparison_OnlyPretest(t *testing.T) {
-	reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo := new(mockReviewRepo), new(mockSessionRepo), new(mockStatsRepo), new(mockCardRepo), new(mockDeckRepo), new(mockQuizRepo), new(mockQuizAttemptRepo)
-	svc := newTestStatsService(reviewRepo, sessionRepo, statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	statsRepo := mockdomain.NewMockStatsRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	quizRepo := mockdomain.NewMockQuizRepository(t)
+	attemptRepo := mockdomain.NewMockQuizAttemptRepository(t)
+	svc := NewStatsService(reviewRepo, mockdomain.NewMockStudySessionRepository(t), statsRepo, cardRepo, deckRepo, quizRepo, attemptRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()

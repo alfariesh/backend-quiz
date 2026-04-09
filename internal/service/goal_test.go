@@ -11,17 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
 )
-
-func newTestGoalService(goalRepo *mockGoalRepo, reviewRepo *mockReviewRepo) *GoalService {
-	return NewGoalService(goalRepo, reviewRepo)
-}
 
 // --- SetGoal ---
 
 func TestGoalService_SetGoal_Success(t *testing.T) {
-	goalRepo, reviewRepo := new(mockGoalRepo), new(mockReviewRepo)
-	svc := newTestGoalService(goalRepo, reviewRepo)
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -42,8 +40,9 @@ func TestGoalService_SetGoal_Success(t *testing.T) {
 // --- DeleteGoal ---
 
 func TestGoalService_DeleteGoal_Success(t *testing.T) {
-	goalRepo, reviewRepo := new(mockGoalRepo), new(mockReviewRepo)
-	svc := newTestGoalService(goalRepo, reviewRepo)
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -58,8 +57,9 @@ func TestGoalService_DeleteGoal_Success(t *testing.T) {
 }
 
 func TestGoalService_DeleteGoal_Forbidden(t *testing.T) {
-	goalRepo, reviewRepo := new(mockGoalRepo), new(mockReviewRepo)
-	svc := newTestGoalService(goalRepo, reviewRepo)
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
 	ctx := context.Background()
 
 	goalID := uuid.New()
@@ -72,8 +72,9 @@ func TestGoalService_DeleteGoal_Forbidden(t *testing.T) {
 }
 
 func TestGoalService_DeleteGoal_NotFound(t *testing.T) {
-	goalRepo, reviewRepo := new(mockGoalRepo), new(mockReviewRepo)
-	svc := newTestGoalService(goalRepo, reviewRepo)
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
 	ctx := context.Background()
 
 	goalID := uuid.New()
@@ -86,8 +87,9 @@ func TestGoalService_DeleteGoal_NotFound(t *testing.T) {
 // --- ListWithProgress ---
 
 func TestGoalService_ListWithProgress_DailyReviews(t *testing.T) {
-	goalRepo, reviewRepo := new(mockGoalRepo), new(mockReviewRepo)
-	svc := newTestGoalService(goalRepo, reviewRepo)
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -107,8 +109,9 @@ func TestGoalService_ListWithProgress_DailyReviews(t *testing.T) {
 }
 
 func TestGoalService_ListWithProgress_DailyReviews_Completed(t *testing.T) {
-	goalRepo, reviewRepo := new(mockGoalRepo), new(mockReviewRepo)
-	svc := newTestGoalService(goalRepo, reviewRepo)
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -126,8 +129,9 @@ func TestGoalService_ListWithProgress_DailyReviews_Completed(t *testing.T) {
 }
 
 func TestGoalService_ListWithProgress_DailyNew(t *testing.T) {
-	goalRepo, reviewRepo := new(mockGoalRepo), new(mockReviewRepo)
-	svc := newTestGoalService(goalRepo, reviewRepo)
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -154,8 +158,9 @@ func TestGoalService_ListWithProgress_DailyNew(t *testing.T) {
 }
 
 func TestGoalService_ListWithProgress_WeeklyReviews(t *testing.T) {
-	goalRepo, reviewRepo := new(mockGoalRepo), new(mockReviewRepo)
-	svc := newTestGoalService(goalRepo, reviewRepo)
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -179,8 +184,9 @@ func TestGoalService_ListWithProgress_WeeklyReviews(t *testing.T) {
 }
 
 func TestGoalService_ListWithProgress_DailyMinutes(t *testing.T) {
-	goalRepo, reviewRepo := new(mockGoalRepo), new(mockReviewRepo)
-	svc := newTestGoalService(goalRepo, reviewRepo)
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -204,8 +210,9 @@ func TestGoalService_ListWithProgress_DailyMinutes(t *testing.T) {
 }
 
 func TestGoalService_ListWithProgress_Empty(t *testing.T) {
-	goalRepo, reviewRepo := new(mockGoalRepo), new(mockReviewRepo)
-	svc := newTestGoalService(goalRepo, reviewRepo)
+	goalRepo := mockdomain.NewMockGoalRepository(t)
+	reviewRepo := mockdomain.NewMockReviewRepository(t)
+	svc := NewGoalService(goalRepo, reviewRepo)
 	ctx := context.Background()
 	userID := uuid.New()
 

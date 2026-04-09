@@ -3,21 +3,22 @@ package handler
 import (
 	"net/http"
 
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
-	"github.com/rekanesiads/backend-quiz/internal/service"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 	"github.com/rekanesiads/backend-quiz/pkg/validate"
 )
 
 type AuthHandler struct {
-	authSvc *service.AuthService
+	authSvc port.AuthServicer
 }
 
-func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
+func NewAuthHandler(authSvc port.AuthServicer) *AuthHandler {
 	return &AuthHandler{authSvc: authSvc}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var req service.RegisterRequest
+	var req dto.RegisterRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -41,7 +42,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var req service.LoginRequest
+	var req dto.LoginRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -105,7 +106,7 @@ func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.UpdateProfileRequest
+	var req dto.UpdateProfileRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return

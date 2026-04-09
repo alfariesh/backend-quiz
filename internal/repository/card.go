@@ -26,7 +26,7 @@ func (r *CardRepository) Create(ctx context.Context, card *domain.Card) error {
 	if card.ContentType == "" {
 		card.ContentType = domain.ContentTypePlain
 	}
-	result, err := r.q.CreateCard(ctx, sqlc.CreateCardParams{
+	result, err := querier(r.q, ctx).CreateCard(ctx, sqlc.CreateCardParams{
 		DeckID:      card.DeckID,
 		Front:       card.Front,
 		Back:        card.Back,
@@ -42,18 +42,20 @@ func (r *CardRepository) Create(ctx context.Context, card *domain.Card) error {
 }
 
 func (r *CardRepository) BulkCreate(ctx context.Context, cards []*domain.Card) error {
-	tx, err := r.pool.Begin(ctx)
+	ctx, tx, isOwner, err := beginOrJoin(ctx, r.pool)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	if isOwner {
+		defer tx.Rollback(ctx)
+	}
 
-	qtx := r.q.WithTx(tx)
+	q := querier(r.q, ctx)
 	for _, card := range cards {
 		if card.ContentType == "" {
 			card.ContentType = domain.ContentTypePlain
 		}
-		result, err := qtx.CreateCard(ctx, sqlc.CreateCardParams{
+		result, err := q.CreateCard(ctx, sqlc.CreateCardParams{
 			DeckID:      card.DeckID,
 			Front:       card.Front,
 			Back:        card.Back,
@@ -67,11 +69,14 @@ func (r *CardRepository) BulkCreate(ctx context.Context, cards []*domain.Card) e
 		*card = cardFromSqlc(result)
 	}
 
-	return tx.Commit(ctx)
+	if isOwner {
+		return tx.Commit(ctx)
+	}
+	return nil
 }
 
 func (r *CardRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Card, error) {
-	result, err := r.q.GetCardByID(ctx, id)
+	result, err := querier(r.q, ctx).GetCardByID(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -96,7 +101,7 @@ func (r *CardRepository) ListByDeckID(ctx context.Context, deckID uuid.UUID, fil
 		queryParam = pgtype.Text{String: filter.Query, Valid: true}
 	}
 
-	rows, err := r.q.ListCardsByDeckID(ctx, sqlc.ListCardsByDeckIDParams{
+	rows, err := querier(r.q, ctx).ListCardsByDeckID(ctx, sqlc.ListCardsByDeckIDParams{
 		DeckID:    deckID,
 		State:     stateParam,
 		Tag:       tagParam,
@@ -108,7 +113,7 @@ func (r *CardRepository) ListByDeckID(ctx context.Context, deckID uuid.UUID, fil
 		return nil, 0, err
 	}
 
-	total, err := r.q.CountCardsByDeckID(ctx, sqlc.CountCardsByDeckIDParams{
+	total, err := querier(r.q, ctx).CountCardsByDeckID(ctx, sqlc.CountCardsByDeckIDParams{
 		DeckID: deckID,
 		State:  stateParam,
 		Tag:    tagParam,
@@ -122,7 +127,7 @@ func (r *CardRepository) ListByDeckID(ctx context.Context, deckID uuid.UUID, fil
 }
 
 func (r *CardRepository) Update(ctx context.Context, card *domain.Card) error {
-	return r.q.UpdateCard(ctx, sqlc.UpdateCardParams{
+	return querier(r.q, ctx).UpdateCard(ctx, sqlc.UpdateCardParams{
 		ID:          card.ID,
 		Front:       card.Front,
 		Back:        card.Back,
@@ -132,7 +137,7 @@ func (r *CardRepository) Update(ctx context.Context, card *domain.Card) error {
 }
 
 func (r *CardRepository) UpdateFSRS(ctx context.Context, card *domain.Card) error {
-	return r.q.UpdateCardFSRS(ctx, sqlc.UpdateCardFSRSParams{
+	return querier(r.q, ctx).UpdateCardFSRS(ctx, sqlc.UpdateCardFSRSParams{
 		ID:            card.ID,
 		Due:           card.Due,
 		Stability:     float32(card.Stability),
@@ -147,22 +152,22 @@ func (r *CardRepository) UpdateFSRS(ctx context.Context, card *domain.Card) erro
 }
 
 func (r *CardRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.q.DeleteCard(ctx, id)
+	return querier(r.q, ctx).DeleteCard(ctx, id)
 }
 
 func (r *CardRepository) SetSuspended(ctx context.Context, id uuid.UUID, suspended bool) error {
-	return r.q.SetCardSuspended(ctx, sqlc.SetCardSuspendedParams{
+	return querier(r.q, ctx).SetCardSuspended(ctx, sqlc.SetCardSuspendedParams{
 		ID:          id,
 		IsSuspended: suspended,
 	})
 }
 
 func (r *CardRepository) ResetFSRS(ctx context.Context, id uuid.UUID) error {
-	return r.q.ResetCardFSRS(ctx, id)
+	return querier(r.q, ctx).ResetCardFSRS(ctx, id)
 }
 
 func (r *CardRepository) GetDueCards(ctx context.Context, deckID uuid.UUID, now time.Time, newLimit, reviewLimit int) ([]domain.Card, error) {
-	rows, err := r.q.GetDueCards(ctx, sqlc.GetDueCardsParams{
+	rows, err := querier(r.q, ctx).GetDueCards(ctx, sqlc.GetDueCardsParams{
 		DeckID:  deckID,
 		Due:     now,
 		Limit:   int32(newLimit + reviewLimit),
@@ -189,7 +194,7 @@ func (r *CardRepository) GetDueCards(ctx context.Context, deckID uuid.UUID, now 
 }
 
 func (r *CardRepository) CountByState(ctx context.Context, deckID uuid.UUID) (map[domain.CardState]int, error) {
-	rows, err := r.q.CountCardsByState(ctx, deckID)
+	rows, err := querier(r.q, ctx).CountCardsByState(ctx, deckID)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +207,7 @@ func (r *CardRepository) CountByState(ctx context.Context, deckID uuid.UUID) (ma
 }
 
 func (r *CardRepository) CountDue(ctx context.Context, deckID uuid.UUID, now time.Time) (int, error) {
-	count, err := r.q.CountDueCards(ctx, sqlc.CountDueCardsParams{
+	count, err := querier(r.q, ctx).CountDueCards(ctx, sqlc.CountDueCardsParams{
 		DeckID: deckID,
 		Due:    now,
 	})
@@ -210,7 +215,7 @@ func (r *CardRepository) CountDue(ctx context.Context, deckID uuid.UUID, now tim
 }
 
 func (r *CardRepository) GetDeckMasteryStats(ctx context.Context, deckID uuid.UUID) (totalCards, matureCards int, avgStability float64, err error) {
-	row, err := r.q.GetDeckMasteryStats(ctx, deckID)
+	row, err := querier(r.q, ctx).GetDeckMasteryStats(ctx, deckID)
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -218,7 +223,7 @@ func (r *CardRepository) GetDeckMasteryStats(ctx context.Context, deckID uuid.UU
 }
 
 func (r *CardRepository) GetNextDueAt(ctx context.Context, userID uuid.UUID, now time.Time) (*time.Time, error) {
-	result, err := r.q.GetNextDueAt(ctx, sqlc.GetNextDueAtParams{
+	result, err := querier(r.q, ctx).GetNextDueAt(ctx, sqlc.GetNextDueAtParams{
 		UserID: userID,
 		Due:    now,
 	})
@@ -235,7 +240,7 @@ func (r *CardRepository) GetNextDueAt(ctx context.Context, userID uuid.UUID, now
 }
 
 func (r *CardRepository) GetUpcomingDueSummary(ctx context.Context, userID uuid.UUID, now time.Time, horizon time.Time) ([]domain.DeckDueSummary, error) {
-	rows, err := r.q.GetUpcomingDueSummary(ctx, sqlc.GetUpcomingDueSummaryParams{
+	rows, err := querier(r.q, ctx).GetUpcomingDueSummary(ctx, sqlc.GetUpcomingDueSummaryParams{
 		UserID: userID,
 		Due:    now,
 		Due_2:  horizon,
@@ -258,7 +263,7 @@ func (r *CardRepository) GetUpcomingDueSummary(ctx context.Context, userID uuid.
 }
 
 func (r *CardRepository) GetWeakCards(ctx context.Context, userID uuid.UUID, limit int) ([]domain.Card, error) {
-	rows, err := r.q.GetWeakCards(ctx, sqlc.GetWeakCardsParams{
+	rows, err := querier(r.q, ctx).GetWeakCards(ctx, sqlc.GetWeakCardsParams{
 		UserID: userID,
 		Limit:  int32(limit),
 	})

@@ -8,7 +8,11 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 )
+
+var _ port.StatsServicer = (*StatsService)(nil)
 
 type StatsService struct {
 	reviewRepo  domain.ReviewRepository
@@ -40,24 +44,9 @@ func NewStatsService(
 	}
 }
 
-type OverviewStats struct {
-	TotalReviews   int     `json:"total_reviews"`
-	Streak         int     `json:"streak"`
-	RetentionRate  float64 `json:"retention_rate"`
-	TodayReviews   int     `json:"today_reviews"`
-	TodayNewCards  int     `json:"today_new_cards"`
-}
-
-type HeatmapEntry struct {
-	Date  string `json:"date"`
-	Count int    `json:"count"`
-}
-
-type ForecastDay struct {
-	Date    string `json:"date"`
-	DueNew  int    `json:"due_new"`
-	DueReview int  `json:"due_review"`
-}
+type OverviewStats = dto.OverviewStats
+type HeatmapEntry = dto.HeatmapEntry
+type ForecastDay = dto.ForecastDay
 
 func (s *StatsService) Overview(ctx context.Context, userID uuid.UUID) (*OverviewStats, error) {
 	streak, err := s.statsRepo.GetStreak(ctx, userID)
@@ -169,17 +158,7 @@ func (s *StatsService) DeckStats(ctx context.Context, userID uuid.UUID, deckID u
 
 // Mastery Level
 
-type DeckMastery struct {
-	DeckID         uuid.UUID `json:"deck_id"`
-	DeckName       string    `json:"deck_name"`
-	MasteryPercent float64   `json:"mastery_percent"`
-	MasteryLevel   string    `json:"mastery_level"`
-	RetentionRate  float64   `json:"retention_rate"`
-	MaturePercent  float64   `json:"mature_percent"`
-	AvgStability   float64   `json:"avg_stability"`
-	TotalCards     int       `json:"total_cards"`
-	MatureCards    int       `json:"mature_cards"`
-}
+type DeckMastery = dto.DeckMastery
 
 func masteryLevel(percent float64) string {
 	switch {
@@ -253,17 +232,8 @@ func (s *StatsService) Mastery(ctx context.Context, userID uuid.UUID) ([]DeckMas
 
 // Weak Area Detection
 
-type WeakArea struct {
-	Tag          string  `json:"tag"`
-	WeakCards    int     `json:"weak_cards"`
-	AvgLapses    float64 `json:"avg_lapses"`
-	AvgStability float64 `json:"avg_stability"`
-}
-
-type WeakAreasResponse struct {
-	WeakAreas []WeakArea    `json:"weak_areas"`
-	WeakCards []domain.Card `json:"weak_cards"`
-}
+type WeakArea = dto.WeakArea
+type WeakAreasResponse = dto.WeakAreasResponse
 
 func (s *StatsService) WeakAreas(ctx context.Context, userID uuid.UUID) (*WeakAreasResponse, error) {
 	cards, err := s.cardRepo.GetWeakCards(ctx, userID, 50)
@@ -315,22 +285,8 @@ func (s *StatsService) WeakAreas(ctx context.Context, userID uuid.UUID) (*WeakAr
 
 // Pre-test / Post-test Comparison
 
-type TestResult struct {
-	QuizID       uuid.UUID `json:"quiz_id"`
-	BestScore    int       `json:"best_score"`
-	TotalPoints  int       `json:"total_points"`
-	ScorePercent float64   `json:"score_percent"`
-	AttemptCount int       `json:"attempt_count"`
-	LastAttempt  time.Time `json:"last_attempt"`
-}
-
-type TestComparison struct {
-	DeckID      uuid.UUID   `json:"deck_id"`
-	DeckName    string      `json:"deck_name"`
-	PreTest     *TestResult `json:"pre_test,omitempty"`
-	PostTest    *TestResult `json:"post_test,omitempty"`
-	Improvement *float64    `json:"improvement,omitempty"`
-}
+type TestResult = dto.TestResult
+type TestComparison = dto.TestComparison
 
 func (s *StatsService) TestComparison(ctx context.Context, userID, deckID uuid.UUID) (*TestComparison, error) {
 	deck, err := s.deckRepo.GetByID(ctx, deckID)

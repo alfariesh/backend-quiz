@@ -20,7 +20,7 @@ func NewGoalRepository(pool *pgxpool.Pool) *GoalRepository {
 }
 
 func (r *GoalRepository) Upsert(ctx context.Context, goal *domain.StudyGoal) error {
-	result, err := r.q.UpsertStudyGoal(ctx, sqlc.UpsertStudyGoalParams{
+	result, err := querier(r.q, ctx).UpsertStudyGoal(ctx, sqlc.UpsertStudyGoalParams{
 		UserID:      goal.UserID,
 		GoalType:    goal.GoalType,
 		TargetValue: int32(goal.TargetValue),
@@ -34,7 +34,7 @@ func (r *GoalRepository) Upsert(ctx context.Context, goal *domain.StudyGoal) err
 }
 
 func (r *GoalRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.StudyGoal, error) {
-	result, err := r.q.GetStudyGoalByID(ctx, id)
+	result, err := querier(r.q, ctx).GetStudyGoalByID(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -46,7 +46,7 @@ func (r *GoalRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Stu
 }
 
 func (r *GoalRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain.StudyGoal, error) {
-	rows, err := r.q.ListStudyGoalsByUserID(ctx, userID)
+	rows, err := querier(r.q, ctx).ListStudyGoalsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,5 +58,5 @@ func (r *GoalRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]
 }
 
 func (r *GoalRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.q.DeleteStudyGoal(ctx, id)
+	return querier(r.q, ctx).DeleteStudyGoal(ctx, id)
 }

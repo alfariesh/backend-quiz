@@ -8,7 +8,11 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 )
+
+var _ port.GoalServicer = (*GoalService)(nil)
 
 type GoalService struct {
 	goalRepo   domain.GoalRepository
@@ -19,17 +23,8 @@ func NewGoalService(goalRepo domain.GoalRepository, reviewRepo domain.ReviewRepo
 	return &GoalService{goalRepo: goalRepo, reviewRepo: reviewRepo}
 }
 
-type SetGoalRequest struct {
-	GoalType    string `json:"goal_type" validate:"required,oneof=daily_reviews daily_new weekly_reviews daily_minutes"`
-	TargetValue int    `json:"target_value" validate:"required,min=1,max=9999"`
-}
-
-type GoalProgress struct {
-	Goal         domain.StudyGoal `json:"goal"`
-	CurrentValue int              `json:"current_value"`
-	Completed    bool             `json:"completed"`
-	Percent      float64          `json:"percent"`
-}
+type SetGoalRequest = dto.SetGoalRequest
+type GoalProgress = dto.GoalProgress
 
 func (s *GoalService) SetGoal(ctx context.Context, userID uuid.UUID, req SetGoalRequest) (*domain.StudyGoal, error) {
 	goal := &domain.StudyGoal{

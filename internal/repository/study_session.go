@@ -21,7 +21,7 @@ func NewStudySessionRepository(pool *pgxpool.Pool) *StudySessionRepository {
 }
 
 func (r *StudySessionRepository) Create(ctx context.Context, session *domain.StudySession) error {
-	result, err := r.q.CreateStudySession(ctx, sqlc.CreateStudySessionParams{
+	result, err := querier(r.q, ctx).CreateStudySession(ctx, sqlc.CreateStudySessionParams{
 		UserID: session.UserID,
 		DeckID: uuidToNullable(session.DeckID),
 	})
@@ -33,7 +33,7 @@ func (r *StudySessionRepository) Create(ctx context.Context, session *domain.Stu
 }
 
 func (r *StudySessionRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.StudySession, error) {
-	result, err := r.q.GetStudySessionByID(ctx, id)
+	result, err := querier(r.q, ctx).GetStudySessionByID(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -45,7 +45,7 @@ func (r *StudySessionRepository) GetByID(ctx context.Context, id uuid.UUID) (*do
 }
 
 func (r *StudySessionRepository) Update(ctx context.Context, session *domain.StudySession) error {
-	_, err := r.q.UpdateStudySession(ctx, sqlc.UpdateStudySessionParams{
+	_, err := querier(r.q, ctx).UpdateStudySession(ctx, sqlc.UpdateStudySessionParams{
 		ID:              session.ID,
 		EndedAt:         timeToNullable(session.EndedAt),
 		NewCount:        pgtype.Int4{Int32: int32(session.NewCount), Valid: true},
@@ -57,7 +57,7 @@ func (r *StudySessionRepository) Update(ctx context.Context, session *domain.Stu
 }
 
 func (r *StudySessionRepository) ListByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.StudySession, int, error) {
-	rows, err := r.q.ListStudySessionsByUserID(ctx, sqlc.ListStudySessionsByUserIDParams{
+	rows, err := querier(r.q, ctx).ListStudySessionsByUserID(ctx, sqlc.ListStudySessionsByUserIDParams{
 		UserID: userID,
 		Limit:  int32(limit),
 		Offset: int32(offset),
@@ -66,7 +66,7 @@ func (r *StudySessionRepository) ListByUserID(ctx context.Context, userID uuid.U
 		return nil, 0, err
 	}
 
-	total, err := r.q.CountStudySessionsByUserID(ctx, userID)
+	total, err := querier(r.q, ctx).CountStudySessionsByUserID(ctx, userID)
 	if err != nil {
 		return nil, 0, err
 	}

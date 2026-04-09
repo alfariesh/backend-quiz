@@ -6,24 +6,25 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
-	"github.com/rekanesiads/backend-quiz/internal/service"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 	"github.com/rekanesiads/backend-quiz/pkg/pagination"
 	"github.com/rekanesiads/backend-quiz/pkg/validate"
 )
 
 type QuizHandler struct {
-	quizSvc *service.QuizService
+	quizSvc port.QuizServicer
 }
 
-func NewQuizHandler(quizSvc *service.QuizService) *QuizHandler {
+func NewQuizHandler(quizSvc port.QuizServicer) *QuizHandler {
 	return &QuizHandler{quizSvc: quizSvc}
 }
 
 func (h *QuizHandler) CreateQuiz(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 
-	var req service.CreateQuizRequest
+	var req dto.CreateQuizRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -77,7 +78,7 @@ func (h *QuizHandler) UpdateQuiz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.UpdateQuizRequest
+	var req dto.UpdateQuizRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -116,7 +117,7 @@ func (h *QuizHandler) AddQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.AddQuestionRequest
+	var req dto.AddQuestionRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -142,7 +143,7 @@ func (h *QuizHandler) BatchAddQuestions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req service.BatchAddQuestionsRequest
+	var req dto.BatchAddQuestionsRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -168,7 +169,7 @@ func (h *QuizHandler) GenerateFromDeck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.GenerateFromDeckRequest
+	var req dto.GenerateFromDeckRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -194,7 +195,7 @@ func (h *QuizHandler) GenerateAyatQuiz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.GenerateAyatQuizRequest
+	var req dto.GenerateAyatQuizRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -225,7 +226,7 @@ func (h *QuizHandler) UpdateQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.UpdateQuestionRequest
+	var req dto.UpdateQuestionRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -318,7 +319,7 @@ func (h *QuizHandler) SubmitAnswer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.SubmitAnswerRequest
+	var req dto.SubmitAnswerRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return

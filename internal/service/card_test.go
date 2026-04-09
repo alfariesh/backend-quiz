@@ -10,11 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
 )
-
-func newTestCardService(cardRepo *mockCardRepo, deckRepo *mockDeckRepo) *CardService {
-	return NewCardService(cardRepo, deckRepo)
-}
 
 var (
 	testUserID = uuid.New()
@@ -40,8 +37,9 @@ func testCard(cardID, deckID uuid.UUID) *domain.Card {
 // --- Create ---
 
 func TestCardService_Create_Success(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(testUserID, testDeckID), nil)
@@ -58,12 +56,12 @@ func TestCardService_Create_Success(t *testing.T) {
 	assert.Equal(t, "A programming language", card.Back)
 	assert.Equal(t, domain.ContentTypePlain, card.ContentType)
 	assert.Equal(t, []string{"programming"}, card.Tags)
-	cardRepo.AssertExpectations(t)
 }
 
 func TestCardService_Create_WithContentType(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(testUserID, testDeckID), nil)
@@ -80,8 +78,9 @@ func TestCardService_Create_WithContentType(t *testing.T) {
 }
 
 func TestCardService_Create_NilTagsDefaultsToEmpty(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(testUserID, testDeckID), nil)
@@ -96,8 +95,9 @@ func TestCardService_Create_NilTagsDefaultsToEmpty(t *testing.T) {
 }
 
 func TestCardService_Create_Forbidden(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	otherUser := uuid.New()
@@ -108,8 +108,9 @@ func TestCardService_Create_Forbidden(t *testing.T) {
 }
 
 func TestCardService_Create_DeckNotFound(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	deckRepo.On("GetByID", ctx, testDeckID).Return(nil, domain.ErrNotFound)
@@ -121,8 +122,9 @@ func TestCardService_Create_DeckNotFound(t *testing.T) {
 // --- BatchCreate ---
 
 func TestCardService_BatchCreate_Success(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(testUserID, testDeckID), nil)
@@ -144,8 +146,9 @@ func TestCardService_BatchCreate_Success(t *testing.T) {
 }
 
 func TestCardService_BatchCreate_Forbidden(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	otherUser := uuid.New()
@@ -160,8 +163,9 @@ func TestCardService_BatchCreate_Forbidden(t *testing.T) {
 // --- Get ---
 
 func TestCardService_Get_Success(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	card := testCard(testCardID, testDeckID)
@@ -174,8 +178,9 @@ func TestCardService_Get_Success(t *testing.T) {
 }
 
 func TestCardService_Get_NotFound(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	cardRepo.On("GetByID", ctx, testCardID).Return(nil, domain.ErrNotFound)
@@ -187,8 +192,9 @@ func TestCardService_Get_NotFound(t *testing.T) {
 // --- List ---
 
 func TestCardService_List_Success(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(testUserID, testDeckID), nil)
@@ -204,8 +210,9 @@ func TestCardService_List_Success(t *testing.T) {
 }
 
 func TestCardService_List_Forbidden(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	otherUser := uuid.New()
@@ -218,8 +225,9 @@ func TestCardService_List_Forbidden(t *testing.T) {
 // --- Update ---
 
 func TestCardService_Update_Success(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	card := testCard(testCardID, testDeckID)
@@ -240,8 +248,9 @@ func TestCardService_Update_Success(t *testing.T) {
 }
 
 func TestCardService_Update_PartialUpdate(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	card := &domain.Card{
@@ -261,8 +270,9 @@ func TestCardService_Update_PartialUpdate(t *testing.T) {
 }
 
 func TestCardService_Update_Forbidden(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	otherUser := uuid.New()
@@ -278,8 +288,9 @@ func TestCardService_Update_Forbidden(t *testing.T) {
 // --- Delete ---
 
 func TestCardService_Delete_Success(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	card := testCard(testCardID, testDeckID)
@@ -289,12 +300,12 @@ func TestCardService_Delete_Success(t *testing.T) {
 
 	err := svc.Delete(ctx, testUserID, testCardID)
 	assert.NoError(t, err)
-	cardRepo.AssertExpectations(t)
 }
 
 func TestCardService_Delete_Forbidden(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	otherUser := uuid.New()
@@ -309,8 +320,9 @@ func TestCardService_Delete_Forbidden(t *testing.T) {
 // --- ResetFSRS ---
 
 func TestCardService_ResetFSRS_Success(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	card := testCard(testCardID, testDeckID)
@@ -331,12 +343,12 @@ func TestCardService_ResetFSRS_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, domain.CardStateNew, result.State)
 	assert.Equal(t, 0.0, result.Stability)
-	cardRepo.AssertExpectations(t)
 }
 
 func TestCardService_ResetFSRS_Forbidden(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	otherUser := uuid.New()
@@ -349,8 +361,9 @@ func TestCardService_ResetFSRS_Forbidden(t *testing.T) {
 }
 
 func TestCardService_ResetFSRS_CardNotFound(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	cardRepo.On("GetByID", ctx, testCardID).Return(nil, domain.ErrNotFound)
@@ -362,8 +375,9 @@ func TestCardService_ResetFSRS_CardNotFound(t *testing.T) {
 // --- Suspend ---
 
 func TestCardService_Suspend_Success(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	card := testCard(testCardID, testDeckID)
@@ -373,12 +387,12 @@ func TestCardService_Suspend_Success(t *testing.T) {
 
 	err := svc.Suspend(ctx, testUserID, testCardID, true)
 	assert.NoError(t, err)
-	cardRepo.AssertExpectations(t)
 }
 
 func TestCardService_Suspend_Forbidden(t *testing.T) {
-	cardRepo, deckRepo := new(mockCardRepo), new(mockDeckRepo)
-	svc := newTestCardService(cardRepo, deckRepo)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
 	ctx := context.Background()
 
 	otherUser := uuid.New()

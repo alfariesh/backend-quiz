@@ -6,7 +6,11 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 )
+
+var _ port.CardServicer = (*CardService)(nil)
 
 type CardService struct {
 	cardRepo domain.CardRepository
@@ -17,27 +21,10 @@ func NewCardService(cardRepo domain.CardRepository, deckRepo domain.DeckReposito
 	return &CardService{cardRepo: cardRepo, deckRepo: deckRepo}
 }
 
-type CreateCardRequest struct {
-	Front       string   `json:"front" validate:"required,min=1"`
-	Back        string   `json:"back" validate:"required,min=1"`
-	ContentType string   `json:"content_type,omitempty" validate:"omitempty,oneof=plain markdown html"`
-	Tags        []string `json:"tags"`
-}
-
-type UpdateCardRequest struct {
-	Front       *string  `json:"front,omitempty" validate:"omitempty,min=1"`
-	Back        *string  `json:"back,omitempty" validate:"omitempty,min=1"`
-	ContentType *string  `json:"content_type,omitempty" validate:"omitempty,oneof=plain markdown html"`
-	Tags        []string `json:"tags,omitempty"`
-}
-
-type BatchCreateRequest struct {
-	Cards []CreateCardRequest `json:"cards" validate:"required,min=1,max=500,dive"`
-}
-
-type SuspendRequest struct {
-	Suspended bool `json:"suspended"`
-}
+type CreateCardRequest = dto.CreateCardRequest
+type UpdateCardRequest = dto.UpdateCardRequest
+type BatchCreateRequest = dto.BatchCreateRequest
+type SuspendRequest = dto.SuspendRequest
 
 func (s *CardService) Create(ctx context.Context, userID, deckID uuid.UUID, req CreateCardRequest) (*domain.Card, error) {
 	deck, err := s.deckRepo.GetByID(ctx, deckID)

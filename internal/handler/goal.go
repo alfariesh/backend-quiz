@@ -6,23 +6,24 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
-	"github.com/rekanesiads/backend-quiz/internal/service"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 	"github.com/rekanesiads/backend-quiz/pkg/validate"
 )
 
 type GoalHandler struct {
-	goalSvc *service.GoalService
+	goalSvc port.GoalServicer
 }
 
-func NewGoalHandler(goalSvc *service.GoalService) *GoalHandler {
+func NewGoalHandler(goalSvc port.GoalServicer) *GoalHandler {
 	return &GoalHandler{goalSvc: goalSvc}
 }
 
 func (h *GoalHandler) SetGoal(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 
-	var req service.SetGoalRequest
+	var req dto.SetGoalRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -49,7 +50,7 @@ func (h *GoalHandler) ListWithProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if progress == nil {
-		progress = []service.GoalProgress{}
+		progress = []dto.GoalProgress{}
 	}
 	JSON(w, http.StatusOK, progress)
 }

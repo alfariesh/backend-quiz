@@ -20,7 +20,7 @@ func NewQuizAttemptRepository(pool *pgxpool.Pool) *QuizAttemptRepository {
 }
 
 func (r *QuizAttemptRepository) Create(ctx context.Context, attempt *domain.QuizAttempt) error {
-	result, err := r.q.CreateQuizAttempt(ctx, sqlc.CreateQuizAttemptParams{
+	result, err := querier(r.q, ctx).CreateQuizAttempt(ctx, sqlc.CreateQuizAttemptParams{
 		QuizID:         attempt.QuizID,
 		UserID:         attempt.UserID,
 		TotalPoints:    int32(attempt.TotalPoints),
@@ -34,7 +34,7 @@ func (r *QuizAttemptRepository) Create(ctx context.Context, attempt *domain.Quiz
 }
 
 func (r *QuizAttemptRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.QuizAttempt, error) {
-	result, err := r.q.GetQuizAttemptByID(ctx, id)
+	result, err := querier(r.q, ctx).GetQuizAttemptByID(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -46,7 +46,7 @@ func (r *QuizAttemptRepository) GetByID(ctx context.Context, id uuid.UUID) (*dom
 }
 
 func (r *QuizAttemptRepository) Update(ctx context.Context, attempt *domain.QuizAttempt) error {
-	return r.q.UpdateQuizAttempt(ctx, sqlc.UpdateQuizAttemptParams{
+	return querier(r.q, ctx).UpdateQuizAttempt(ctx, sqlc.UpdateQuizAttemptParams{
 		ID:          attempt.ID,
 		CompletedAt: timeToNullable(attempt.CompletedAt),
 		Score:       int32(attempt.Score),
@@ -56,7 +56,7 @@ func (r *QuizAttemptRepository) Update(ctx context.Context, attempt *domain.Quiz
 }
 
 func (r *QuizAttemptRepository) ListByQuizID(ctx context.Context, quizID uuid.UUID, limit, offset int) ([]domain.QuizAttempt, int, error) {
-	rows, err := r.q.ListQuizAttemptsByQuizID(ctx, sqlc.ListQuizAttemptsByQuizIDParams{
+	rows, err := querier(r.q, ctx).ListQuizAttemptsByQuizID(ctx, sqlc.ListQuizAttemptsByQuizIDParams{
 		QuizID: quizID,
 		Limit:  int32(limit),
 		Offset: int32(offset),
@@ -65,7 +65,7 @@ func (r *QuizAttemptRepository) ListByQuizID(ctx context.Context, quizID uuid.UU
 		return nil, 0, err
 	}
 
-	total, err := r.q.CountQuizAttemptsByQuizID(ctx, quizID)
+	total, err := querier(r.q, ctx).CountQuizAttemptsByQuizID(ctx, quizID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -78,7 +78,7 @@ func (r *QuizAttemptRepository) ListByQuizID(ctx context.Context, quizID uuid.UU
 }
 
 func (r *QuizAttemptRepository) ListByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.QuizAttempt, int, error) {
-	rows, err := r.q.ListQuizAttemptsByUserID(ctx, sqlc.ListQuizAttemptsByUserIDParams{
+	rows, err := querier(r.q, ctx).ListQuizAttemptsByUserID(ctx, sqlc.ListQuizAttemptsByUserIDParams{
 		UserID: userID,
 		Limit:  int32(limit),
 		Offset: int32(offset),
@@ -87,7 +87,7 @@ func (r *QuizAttemptRepository) ListByUserID(ctx context.Context, userID uuid.UU
 		return nil, 0, err
 	}
 
-	total, err := r.q.CountQuizAttemptsByUserID(ctx, userID)
+	total, err := querier(r.q, ctx).CountQuizAttemptsByUserID(ctx, userID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -102,7 +102,7 @@ func (r *QuizAttemptRepository) ListByUserID(ctx context.Context, userID uuid.UU
 // Answer operations
 
 func (r *QuizAttemptRepository) CreateAnswer(ctx context.Context, answer *domain.QuizAnswer) error {
-	result, err := r.q.CreateQuizAnswer(ctx, sqlc.CreateQuizAnswerParams{
+	result, err := querier(r.q, ctx).CreateQuizAnswer(ctx, sqlc.CreateQuizAnswerParams{
 		AttemptID:    answer.AttemptID,
 		QuestionID:   answer.QuestionID,
 		UserAnswer:   answer.UserAnswer,
@@ -118,7 +118,7 @@ func (r *QuizAttemptRepository) CreateAnswer(ctx context.Context, answer *domain
 }
 
 func (r *QuizAttemptRepository) ListAnswersByAttemptID(ctx context.Context, attemptID uuid.UUID) ([]domain.QuizAnswer, error) {
-	rows, err := r.q.ListQuizAnswersByAttemptID(ctx, attemptID)
+	rows, err := querier(r.q, ctx).ListQuizAnswersByAttemptID(ctx, attemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (r *QuizAttemptRepository) ListAnswersByAttemptID(ctx context.Context, atte
 }
 
 func (r *QuizAttemptRepository) GetAnswerByAttemptAndQuestion(ctx context.Context, attemptID, questionID uuid.UUID) (*domain.QuizAnswer, error) {
-	result, err := r.q.GetQuizAnswerByAttemptAndQuestion(ctx, sqlc.GetQuizAnswerByAttemptAndQuestionParams{
+	result, err := querier(r.q, ctx).GetQuizAnswerByAttemptAndQuestion(ctx, sqlc.GetQuizAnswerByAttemptAndQuestionParams{
 		AttemptID:  attemptID,
 		QuestionID: questionID,
 	})
@@ -145,7 +145,7 @@ func (r *QuizAttemptRepository) GetAnswerByAttemptAndQuestion(ctx context.Contex
 }
 
 func (r *QuizAttemptRepository) GetBestAttemptByQuizID(ctx context.Context, quizID uuid.UUID) (*domain.QuizAttempt, error) {
-	result, err := r.q.GetBestAttemptByQuizID(ctx, quizID)
+	result, err := querier(r.q, ctx).GetBestAttemptByQuizID(ctx, quizID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound

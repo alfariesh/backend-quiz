@@ -20,7 +20,7 @@ func NewMediaRepository(pool *pgxpool.Pool) *MediaRepository {
 }
 
 func (r *MediaRepository) Create(ctx context.Context, media *domain.Media) error {
-	result, err := r.q.CreateMedia(ctx, sqlc.CreateMediaParams{
+	result, err := querier(r.q, ctx).CreateMedia(ctx, sqlc.CreateMediaParams{
 		UserID:   media.UserID,
 		CardID:   uuidToNullable(media.CardID),
 		FileName: media.FileName,
@@ -37,7 +37,7 @@ func (r *MediaRepository) Create(ctx context.Context, media *domain.Media) error
 }
 
 func (r *MediaRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Media, error) {
-	result, err := r.q.GetMediaByID(ctx, id)
+	result, err := querier(r.q, ctx).GetMediaByID(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -49,11 +49,11 @@ func (r *MediaRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Me
 }
 
 func (r *MediaRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.q.DeleteMedia(ctx, id)
+	return querier(r.q, ctx).DeleteMedia(ctx, id)
 }
 
 func (r *MediaRepository) ListByCardID(ctx context.Context, cardID uuid.UUID) ([]domain.Media, error) {
-	rows, err := r.q.ListMediaByCardID(ctx, uuidToNullable(&cardID))
+	rows, err := querier(r.q, ctx).ListMediaByCardID(ctx, uuidToNullable(&cardID))
 	if err != nil {
 		return nil, err
 	}

@@ -13,19 +13,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
 )
 
 const testJWTSecret = "test-secret-key-for-testing"
 
-func newTestAuthService(repo *mockUserRepo) *AuthService {
-	return NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
-}
-
 // --- Register ---
 
 func TestAuthService_Register_Success(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
@@ -51,13 +48,11 @@ func TestAuthService_Register_Success(t *testing.T) {
 	createCall := repo.Calls[1]
 	createdUser := createCall.Arguments.Get(1).(*domain.User)
 	assert.NoError(t, bcrypt.CompareHashAndPassword([]byte(createdUser.PasswordHash), []byte("password123")))
-
-	repo.AssertExpectations(t)
 }
 
 func TestAuthService_Register_EmailTaken(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	existing := &domain.User{ID: uuid.New(), Email: "test@example.com"}
@@ -70,12 +65,11 @@ func TestAuthService_Register_EmailTaken(t *testing.T) {
 	})
 
 	assert.ErrorIs(t, err, domain.ErrEmailTaken)
-	repo.AssertExpectations(t)
 }
 
 func TestAuthService_Register_RepoError(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, assert.AnError)
@@ -88,14 +82,13 @@ func TestAuthService_Register_RepoError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.NotErrorIs(t, err, domain.ErrEmailTaken)
-	repo.AssertExpectations(t)
 }
 
 // --- Login ---
 
 func TestAuthService_Login_Success(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.MinCost)
@@ -115,12 +108,11 @@ func TestAuthService_Login_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, tokens.AccessToken)
 	assert.Equal(t, user.ID, returnedUser.ID)
-	repo.AssertExpectations(t)
 }
 
 func TestAuthService_Login_UserNotFound(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	repo.On("GetByEmail", ctx, "noone@example.com").Return(nil, domain.ErrNotFound)
@@ -131,12 +123,11 @@ func TestAuthService_Login_UserNotFound(t *testing.T) {
 	})
 
 	assert.ErrorIs(t, err, domain.ErrInvalidCredentials)
-	repo.AssertExpectations(t)
 }
 
 func TestAuthService_Login_WrongPassword(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte("correct-password"), bcrypt.MinCost)
@@ -149,14 +140,13 @@ func TestAuthService_Login_WrongPassword(t *testing.T) {
 	})
 
 	assert.ErrorIs(t, err, domain.ErrInvalidCredentials)
-	repo.AssertExpectations(t)
 }
 
 // --- RefreshToken ---
 
 func TestAuthService_RefreshToken_Success(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -178,12 +168,11 @@ func TestAuthService_RefreshToken_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, tokens.AccessToken)
 	assert.NotEmpty(t, tokens.RefreshToken)
-	repo.AssertExpectations(t)
 }
 
 func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	_, err := svc.RefreshToken(ctx, "invalid-token")
@@ -191,8 +180,8 @@ func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
 }
 
 func TestAuthService_RefreshToken_AccessTokenRejected(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	// Use access type instead of refresh
@@ -208,8 +197,8 @@ func TestAuthService_RefreshToken_AccessTokenRejected(t *testing.T) {
 }
 
 func TestAuthService_RefreshToken_ExpiredToken(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	claims := jwt.MapClaims{
@@ -224,8 +213,8 @@ func TestAuthService_RefreshToken_ExpiredToken(t *testing.T) {
 }
 
 func TestAuthService_RefreshToken_UserDeleted(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -240,14 +229,13 @@ func TestAuthService_RefreshToken_UserDeleted(t *testing.T) {
 
 	_, err := svc.RefreshToken(ctx, token)
 	assert.ErrorIs(t, err, domain.ErrUnauthorized)
-	repo.AssertExpectations(t)
 }
 
 // --- GetProfile ---
 
 func TestAuthService_GetProfile(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -258,12 +246,11 @@ func TestAuthService_GetProfile(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, userID, result.ID)
-	repo.AssertExpectations(t)
 }
 
 func TestAuthService_GetProfile_NotFound(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -271,14 +258,13 @@ func TestAuthService_GetProfile_NotFound(t *testing.T) {
 
 	_, err := svc.GetProfile(ctx, userID)
 	assert.ErrorIs(t, err, domain.ErrNotFound)
-	repo.AssertExpectations(t)
 }
 
 // --- UpdateProfile ---
 
 func TestAuthService_UpdateProfile_AllFields(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -328,12 +314,11 @@ func TestAuthService_UpdateProfile_AllFields(t *testing.T) {
 	assert.Equal(t, weights, result.FSRSWeights)
 	assert.True(t, result.ReminderEnabled)
 	assert.Equal(t, "08:00", result.ReminderTime)
-	repo.AssertExpectations(t)
 }
 
 func TestAuthService_UpdateProfile_PartialUpdate(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -360,12 +345,11 @@ func TestAuthService_UpdateProfile_PartialUpdate(t *testing.T) {
 	assert.Equal(t, 0.9, result.DesiredRetention)           // unchanged
 	assert.Equal(t, 20, result.DailyNewLimit)               // unchanged
 	assert.Equal(t, 200, result.DailyReviewLimit)           // unchanged
-	repo.AssertExpectations(t)
 }
 
 func TestAuthService_UpdateProfile_FSRSWeightsOnly(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -386,12 +370,11 @@ func TestAuthService_UpdateProfile_FSRSWeightsOnly(t *testing.T) {
 	require.Len(t, result.FSRSWeights, 19)
 	assert.Equal(t, 0.4, result.FSRSWeights[0])
 	assert.Equal(t, 0.6, result.FSRSWeights[1])
-	repo.AssertExpectations(t)
 }
 
 func TestAuthService_UpdateProfile_UserNotFound(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -399,14 +382,13 @@ func TestAuthService_UpdateProfile_UserNotFound(t *testing.T) {
 
 	_, err := svc.UpdateProfile(ctx, userID, UpdateProfileRequest{})
 	assert.ErrorIs(t, err, domain.ErrNotFound)
-	repo.AssertExpectations(t)
 }
 
 // --- FindOrCreateOAuthUser ---
 
 func TestAuthService_FindOrCreateOAuthUser_ExistingOAuth(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -421,12 +403,11 @@ func TestAuthService_FindOrCreateOAuthUser_ExistingOAuth(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, tokens.AccessToken)
 	assert.Equal(t, userID, returnedUser.ID)
-	repo.AssertExpectations(t)
 }
 
 func TestAuthService_FindOrCreateOAuthUser_NewUser(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	repo.On("GetOAuthAccount", ctx, "google", "g456").Return(nil, domain.ErrNotFound)
@@ -440,12 +421,11 @@ func TestAuthService_FindOrCreateOAuthUser_NewUser(t *testing.T) {
 	assert.NotEmpty(t, tokens.AccessToken)
 	assert.Equal(t, "new@example.com", user.Email)
 	assert.Equal(t, "New User", user.DisplayName)
-	repo.AssertExpectations(t)
 }
 
 func TestAuthService_FindOrCreateOAuthUser_ExistingEmailLinkOAuth(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 	ctx := context.Background()
 
 	userID := uuid.New()
@@ -460,14 +440,13 @@ func TestAuthService_FindOrCreateOAuthUser_ExistingEmailLinkOAuth(t *testing.T) 
 	require.NoError(t, err)
 	assert.NotEmpty(t, tokens.AccessToken)
 	assert.Equal(t, userID, user.ID) // linked to existing user
-	repo.AssertExpectations(t)
 }
 
 // --- generateTokens (via JWT structure validation) ---
 
 func TestAuthService_GenerateTokens_Structure(t *testing.T) {
-	repo := new(mockUserRepo)
-	svc := newTestAuthService(repo)
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, testJWTSecret, 15*time.Minute, 720*time.Hour)
 
 	userID := uuid.New()
 	tokens, err := svc.generateTokens(userID)

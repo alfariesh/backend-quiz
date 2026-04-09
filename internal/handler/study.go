@@ -7,23 +7,24 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
-	"github.com/rekanesiads/backend-quiz/internal/service"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 	"github.com/rekanesiads/backend-quiz/pkg/validate"
 )
 
 type StudyHandler struct {
-	studySvc *service.StudyService
+	studySvc port.StudyServicer
 }
 
-func NewStudyHandler(studySvc *service.StudyService) *StudyHandler {
+func NewStudyHandler(studySvc port.StudyServicer) *StudyHandler {
 	return &StudyHandler{studySvc: studySvc}
 }
 
 func (h *StudyHandler) StartSession(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 
-	var req service.StartSessionRequest
+	var req dto.StartSessionRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -65,7 +66,7 @@ func (h *StudyHandler) SubmitReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.SubmitReviewRequest
+	var req dto.SubmitReviewRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -91,7 +92,7 @@ func (h *StudyHandler) BatchReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.BatchReviewRequest
+	var req dto.BatchReviewRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return

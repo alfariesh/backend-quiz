@@ -7,15 +7,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
-	"github.com/rekanesiads/backend-quiz/internal/service"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 )
 
 type StatsHandler struct {
-	statsSvc *service.StatsService
+	statsSvc port.StatsServicer
 }
 
-func NewStatsHandler(statsSvc *service.StatsService) *StatsHandler {
+func NewStatsHandler(statsSvc port.StatsServicer) *StatsHandler {
 	return &StatsHandler{statsSvc: statsSvc}
 }
 
@@ -93,7 +94,7 @@ func (h *StatsHandler) Mastery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if mastery == nil {
-		mastery = []service.DeckMastery{}
+		mastery = []dto.DeckMastery{}
 	}
 	JSON(w, http.StatusOK, mastery)
 }

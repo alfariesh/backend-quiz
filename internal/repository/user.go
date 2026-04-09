@@ -40,7 +40,7 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 }
 
 func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
-	result, err := r.q.CreateUser(ctx, sqlc.CreateUserParams{
+	result, err := querier(r.q, ctx).CreateUser(ctx, sqlc.CreateUserParams{
 		Email:            user.Email,
 		PasswordHash:     user.PasswordHash,
 		DisplayName:      user.DisplayName,
@@ -57,7 +57,7 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
-	result, err := r.q.GetUserByID(ctx, id)
+	result, err := querier(r.q, ctx).GetUserByID(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -69,7 +69,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Use
 }
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	result, err := r.q.GetUserByEmail(ctx, email)
+	result, err := querier(r.q, ctx).GetUserByEmail(ctx, email)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -89,7 +89,7 @@ func (r *UserRepository) Update(ctx context.Context, user *domain.User) error {
 		}
 	}
 
-	result, err := r.q.UpdateUser(ctx, sqlc.UpdateUserParams{
+	result, err := querier(r.q, ctx).UpdateUser(ctx, sqlc.UpdateUserParams{
 		ID:               user.ID,
 		DisplayName:      pgtype.Text{String: user.DisplayName, Valid: true},
 		Timezone:         pgtype.Text{String: user.Timezone, Valid: true},
@@ -108,7 +108,7 @@ func (r *UserRepository) Update(ctx context.Context, user *domain.User) error {
 }
 
 func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.q.DeleteUser(ctx, id)
+	return querier(r.q, ctx).DeleteUser(ctx, id)
 }
 
 func (r *UserRepository) CreateOAuthAccount(ctx context.Context, account *domain.OAuthAccount) error {
@@ -116,7 +116,7 @@ func (r *UserRepository) CreateOAuthAccount(ctx context.Context, account *domain
 	if account.AvatarURL != nil {
 		avatarURL = pgtype.Text{String: *account.AvatarURL, Valid: true}
 	}
-	result, err := r.q.CreateOAuthAccount(ctx, sqlc.CreateOAuthAccountParams{
+	result, err := querier(r.q, ctx).CreateOAuthAccount(ctx, sqlc.CreateOAuthAccountParams{
 		UserID:     account.UserID,
 		Provider:   account.Provider,
 		ProviderID: account.ProviderID,
@@ -132,7 +132,7 @@ func (r *UserRepository) CreateOAuthAccount(ctx context.Context, account *domain
 }
 
 func (r *UserRepository) GetOAuthAccount(ctx context.Context, provider, providerID string) (*domain.OAuthAccount, error) {
-	result, err := r.q.GetOAuthAccount(ctx, sqlc.GetOAuthAccountParams{
+	result, err := querier(r.q, ctx).GetOAuthAccount(ctx, sqlc.GetOAuthAccountParams{
 		Provider:   provider,
 		ProviderID: providerID,
 	})

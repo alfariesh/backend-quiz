@@ -7,15 +7,16 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/rekanesiads/backend-quiz/internal/dto"
 	"github.com/rekanesiads/backend-quiz/internal/middleware"
-	"github.com/rekanesiads/backend-quiz/internal/service"
+	"github.com/rekanesiads/backend-quiz/internal/port"
 )
 
 type MediaHandler struct {
-	mediaSvc *service.MediaService
+	mediaSvc port.MediaServicer
 }
 
-func NewMediaHandler(mediaSvc *service.MediaService) *MediaHandler {
+func NewMediaHandler(mediaSvc port.MediaServicer) *MediaHandler {
 	return &MediaHandler{mediaSvc: mediaSvc}
 }
 
@@ -40,7 +41,7 @@ func (h *MediaHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	req := service.UploadMediaRequest{
+	req := dto.UploadMediaRequest{
 		FileName:    header.Filename,
 		FileSize:    int(header.Size),
 		ContentType: header.Header.Get("Content-Type"),

@@ -24,7 +24,7 @@ func (r *ReviewRepository) Create(ctx context.Context, log *domain.ReviewLog) er
 	if log.Source == "" {
 		log.Source = domain.ReviewSourceFlashcard
 	}
-	result, err := r.q.CreateReviewLog(ctx, sqlc.CreateReviewLogParams{
+	result, err := querier(r.q, ctx).CreateReviewLog(ctx, sqlc.CreateReviewLogParams{
 		CardID:        log.CardID,
 		UserID:        log.UserID,
 		Rating:        int16(log.Rating),
@@ -45,7 +45,7 @@ func (r *ReviewRepository) Create(ctx context.Context, log *domain.ReviewLog) er
 }
 
 func (r *ReviewRepository) ListByCardID(ctx context.Context, cardID uuid.UUID) ([]domain.ReviewLog, error) {
-	rows, err := r.q.ListReviewLogsByCardID(ctx, cardID)
+	rows, err := querier(r.q, ctx).ListReviewLogsByCardID(ctx, cardID)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (r *ReviewRepository) ListByCardID(ctx context.Context, cardID uuid.UUID) (
 }
 
 func (r *ReviewRepository) ListByUserID(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int) ([]domain.ReviewLog, int, error) {
-	rows, err := r.q.ListReviewLogsByUserID(ctx, sqlc.ListReviewLogsByUserIDParams{
+	rows, err := querier(r.q, ctx).ListReviewLogsByUserID(ctx, sqlc.ListReviewLogsByUserIDParams{
 		UserID:     userID,
 		ReviewedAt: from,
 		ReviewedAt_2: to,
@@ -68,7 +68,7 @@ func (r *ReviewRepository) ListByUserID(ctx context.Context, userID uuid.UUID, f
 		return nil, 0, err
 	}
 
-	total, err := r.q.CountReviewLogsByUserID(ctx, sqlc.CountReviewLogsByUserIDParams{
+	total, err := querier(r.q, ctx).CountReviewLogsByUserID(ctx, sqlc.CountReviewLogsByUserIDParams{
 		UserID:     userID,
 		ReviewedAt: from,
 		ReviewedAt_2: to,
@@ -85,7 +85,7 @@ func (r *ReviewRepository) ListByUserID(ctx context.Context, userID uuid.UUID, f
 }
 
 func (r *ReviewRepository) CountByUserAndDate(ctx context.Context, userID uuid.UUID, date time.Time) (int, error) {
-	count, err := r.q.CountReviewsByUserAndDate(ctx, sqlc.CountReviewsByUserAndDateParams{
+	count, err := querier(r.q, ctx).CountReviewsByUserAndDate(ctx, sqlc.CountReviewsByUserAndDateParams{
 		UserID: userID,
 		Date:   pgtype.Date{Time: date, Valid: true},
 	})
@@ -93,7 +93,7 @@ func (r *ReviewRepository) CountByUserAndDate(ctx context.Context, userID uuid.U
 }
 
 func (r *ReviewRepository) GetReviewCountsPerDay(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]domain.DailyReviewCount, error) {
-	rows, err := r.q.GetReviewCountsPerDay(ctx, sqlc.GetReviewCountsPerDayParams{
+	rows, err := querier(r.q, ctx).GetReviewCountsPerDay(ctx, sqlc.GetReviewCountsPerDayParams{
 		UserID:       userID,
 		ReviewedAt:   from,
 		ReviewedAt_2: to,

@@ -26,7 +26,7 @@ func (r *StatsRepository) UpsertDailyStats(ctx context.Context, stats *domain.Da
 		retentionRate = pgtype.Float4{Float32: float32(*stats.RetentionRate), Valid: true}
 	}
 
-	result, err := r.q.UpsertDailyStats(ctx, sqlc.UpsertDailyStatsParams{
+	result, err := querier(r.q, ctx).UpsertDailyStats(ctx, sqlc.UpsertDailyStatsParams{
 		UserID:          stats.UserID,
 		Date:            pgtype.Date{Time: stats.Date, Valid: true},
 		NewCards:        int32(stats.NewCards),
@@ -43,7 +43,7 @@ func (r *StatsRepository) UpsertDailyStats(ctx context.Context, stats *domain.Da
 }
 
 func (r *StatsRepository) GetDailyStats(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]domain.DailyStats, error) {
-	rows, err := r.q.GetDailyStats(ctx, sqlc.GetDailyStatsParams{
+	rows, err := querier(r.q, ctx).GetDailyStats(ctx, sqlc.GetDailyStatsParams{
 		UserID: userID,
 		Date:   pgtype.Date{Time: from, Valid: true},
 		Date_2: pgtype.Date{Time: to, Valid: true},
@@ -74,7 +74,7 @@ func (r *StatsRepository) GetDailyStats(ctx context.Context, userID uuid.UUID, f
 }
 
 func (r *StatsRepository) GetStreak(ctx context.Context, userID uuid.UUID) (int, error) {
-	result, err := r.q.GetStreak(ctx, userID)
+	result, err := querier(r.q, ctx).GetStreak(ctx, userID)
 	if err != nil {
 		return 0, err
 	}
@@ -90,7 +90,7 @@ func (r *StatsRepository) GetStreak(ctx context.Context, userID uuid.UUID) (int,
 }
 
 func (r *StatsRepository) GetGlobalLeaderboard(ctx context.Context, limit int) ([]domain.LeaderboardEntry, error) {
-	rows, err := r.q.GetGlobalLeaderboard(ctx, int32(limit))
+	rows, err := querier(r.q, ctx).GetGlobalLeaderboard(ctx, int32(limit))
 	if err != nil {
 		return nil, err
 	}

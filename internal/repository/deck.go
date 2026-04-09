@@ -22,7 +22,7 @@ func NewDeckRepository(pool *pgxpool.Pool) *DeckRepository {
 }
 
 func (r *DeckRepository) Create(ctx context.Context, deck *domain.Deck) error {
-	result, err := r.q.CreateDeck(ctx, sqlc.CreateDeckParams{
+	result, err := querier(r.q, ctx).CreateDeck(ctx, sqlc.CreateDeckParams{
 		UserID:         deck.UserID,
 		Name:           deck.Name,
 		Description:    deck.Description,
@@ -37,7 +37,7 @@ func (r *DeckRepository) Create(ctx context.Context, deck *domain.Deck) error {
 }
 
 func (r *DeckRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Deck, error) {
-	result, err := r.q.GetDeckByID(ctx, id)
+	result, err := querier(r.q, ctx).GetDeckByID(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -49,7 +49,7 @@ func (r *DeckRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Dec
 }
 
 func (r *DeckRepository) ListByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.DeckWithCounts, int, error) {
-	rows, err := r.q.ListDecksByUserID(ctx, sqlc.ListDecksByUserIDParams{
+	rows, err := querier(r.q, ctx).ListDecksByUserID(ctx, sqlc.ListDecksByUserIDParams{
 		UserID: userID,
 		Limit:  int32(limit),
 		Offset: int32(offset),
@@ -58,7 +58,7 @@ func (r *DeckRepository) ListByUserID(ctx context.Context, userID uuid.UUID, lim
 		return nil, 0, err
 	}
 
-	total, err := r.q.CountDecksByUserID(ctx, userID)
+	total, err := querier(r.q, ctx).CountDecksByUserID(ctx, userID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -88,7 +88,7 @@ func (r *DeckRepository) ListByUserID(ctx context.Context, userID uuid.UUID, lim
 }
 
 func (r *DeckRepository) Update(ctx context.Context, deck *domain.Deck) error {
-	result, err := r.q.UpdateDeck(ctx, sqlc.UpdateDeckParams{
+	result, err := querier(r.q, ctx).UpdateDeck(ctx, sqlc.UpdateDeckParams{
 		ID:             deck.ID,
 		Name:           pgtype.Text{String: deck.Name, Valid: true},
 		Description:    pgtype.Text{String: deck.Description, Valid: true},
@@ -104,11 +104,11 @@ func (r *DeckRepository) Update(ctx context.Context, deck *domain.Deck) error {
 }
 
 func (r *DeckRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.q.DeleteDeck(ctx, id)
+	return querier(r.q, ctx).DeleteDeck(ctx, id)
 }
 
 func (r *DeckRepository) CreateShare(ctx context.Context, share *domain.DeckShare) error {
-	result, err := r.q.CreateDeckShare(ctx, sqlc.CreateDeckShareParams{
+	result, err := querier(r.q, ctx).CreateDeckShare(ctx, sqlc.CreateDeckShareParams{
 		DeckID:    share.DeckID,
 		ShareCode: share.ShareCode,
 		IsPublic:  share.IsPublic,
@@ -121,7 +121,7 @@ func (r *DeckRepository) CreateShare(ctx context.Context, share *domain.DeckShar
 }
 
 func (r *DeckRepository) GetShareByDeckID(ctx context.Context, deckID uuid.UUID) (*domain.DeckShare, error) {
-	result, err := r.q.GetDeckShareByDeckID(ctx, deckID)
+	result, err := querier(r.q, ctx).GetDeckShareByDeckID(ctx, deckID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -133,7 +133,7 @@ func (r *DeckRepository) GetShareByDeckID(ctx context.Context, deckID uuid.UUID)
 }
 
 func (r *DeckRepository) GetShareByCode(ctx context.Context, code string) (*domain.DeckShare, error) {
-	result, err := r.q.GetDeckShareByCode(ctx, code)
+	result, err := querier(r.q, ctx).GetDeckShareByCode(ctx, code)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -145,11 +145,11 @@ func (r *DeckRepository) GetShareByCode(ctx context.Context, code string) (*doma
 }
 
 func (r *DeckRepository) DeleteShare(ctx context.Context, deckID uuid.UUID) error {
-	return r.q.DeleteDeckShare(ctx, deckID)
+	return querier(r.q, ctx).DeleteDeckShare(ctx, deckID)
 }
 
 func (r *DeckRepository) ListPublicDecks(ctx context.Context, search string, limit, offset int) ([]domain.DeckWithCounts, int, error) {
-	rows, err := r.q.ListPublicDecks(ctx, sqlc.ListPublicDecksParams{
+	rows, err := querier(r.q, ctx).ListPublicDecks(ctx, sqlc.ListPublicDecksParams{
 		Column1: search,
 		Limit:   int32(limit),
 		Offset:  int32(offset),
@@ -158,7 +158,7 @@ func (r *DeckRepository) ListPublicDecks(ctx context.Context, search string, lim
 		return nil, 0, err
 	}
 
-	total, err := r.q.CountPublicDecks(ctx, search)
+	total, err := querier(r.q, ctx).CountPublicDecks(ctx, search)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -184,13 +184,14 @@ func (r *DeckRepository) ListPublicDecks(ctx context.Context, search string, lim
 }
 
 func (r *DeckRepository) CloneDeck(ctx context.Context, sourceDeckID, targetUserID uuid.UUID, name string) (*domain.Deck, error) {
-	tx, err := r.pool.Begin(ctx)
+	ctx, tx, isOwner, err := beginOrJoin(ctx, r.pool)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	if isOwner {
+		defer tx.Rollback(ctx)
+	}
 
-	// CloneDeck is a complex transaction not covered by sqlc — use raw pgx
 	var deck domain.Deck
 	err = tx.QueryRow(ctx,
 		`INSERT INTO decks (user_id, name, description)
@@ -212,5 +213,8 @@ func (r *DeckRepository) CloneDeck(ctx context.Context, sourceDeckID, targetUser
 		return nil, err
 	}
 
-	return &deck, tx.Commit(ctx)
+	if isOwner {
+		return &deck, tx.Commit(ctx)
+	}
+	return &deck, nil
 }
