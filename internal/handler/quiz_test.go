@@ -891,6 +891,26 @@ func TestQuizHandler_SubmitAnswer_ValidationError(t *testing.T) {
 
 // --- CompleteAttempt ---
 
+func TestQuizHandler_CompleteAttempt_Success(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	attemptID := uuid.New()
+	now := time.Now()
+	svc.EXPECT().CompleteAttempt(mock.Anything, uid, attemptID).Return(
+		&domain.QuizAttempt{ID: attemptID, UserID: uid, CompletedAt: &now}, nil,
+	)
+
+	req := httptest.NewRequest(http.MethodPost, "/attempts/"+attemptID.String()+"/complete", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
 func TestQuizHandler_CompleteAttempt_InvalidAttemptID(t *testing.T) {
 	svc := mockport.NewMockQuizServicer(t)
 	h := NewQuizHandler(svc)
@@ -919,4 +939,232 @@ func TestQuizHandler_CompleteAttempt_NotFound(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+// --- ListQuizzes: service error ---
+
+func TestQuizHandler_ListQuizzes_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().ListQuizzes(mock.Anything, uid, mock.Anything, mock.Anything).Return(nil, 0, assert.AnError)
+
+	req := httptest.NewRequest(http.MethodGet, "/quizzes", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+// --- DeleteQuiz: service error ---
+
+func TestQuizHandler_DeleteQuiz_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	svc.EXPECT().DeleteQuiz(mock.Anything, uid, quizID).Return(domain.ErrForbidden)
+
+	req := httptest.NewRequest(http.MethodDelete, "/quizzes/"+quizID.String(), nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+// --- BatchAddQuestions: service error & invalid quizID ---
+
+func TestQuizHandler_BatchAddQuestions_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	svc.EXPECT().BatchAddQuestions(mock.Anything, uid, quizID, mock.Anything).Return(nil, assert.AnError)
+
+	body := `{"questions":[{"question_type":"fill_blank","question_text":"Q?","correct_answer":"A"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/quizzes/"+quizID.String()+"/questions/batch", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestQuizHandler_BatchAddQuestions_InvalidQuizID(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	body := `{"questions":[{"question_type":"fill_blank","question_text":"Q?","correct_answer":"A"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/quizzes/not-a-uuid/questions/batch", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uuid.New()))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+// --- StartAttempt: service error ---
+
+func TestQuizHandler_StartAttempt_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	svc.EXPECT().StartAttempt(mock.Anything, uid, quizID).Return(nil, domain.ErrQuizNotPublished)
+
+	req := httptest.NewRequest(http.MethodPost, "/quizzes/"+quizID.String()+"/attempts", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.NotEqual(t, http.StatusOK, rec.Code)
+}
+
+// --- ListAttempts: service error ---
+
+func TestQuizHandler_ListAttempts_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	svc.EXPECT().ListAttempts(mock.Anything, uid, quizID, mock.Anything, mock.Anything).Return(nil, 0, assert.AnError)
+
+	req := httptest.NewRequest(http.MethodGet, "/quizzes/"+quizID.String()+"/attempts", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+// --- UpdateQuiz: service error ---
+
+func TestQuizHandler_UpdateQuiz_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	svc.EXPECT().UpdateQuiz(mock.Anything, uid, quizID, mock.Anything).Return(nil, domain.ErrForbidden)
+
+	body := `{"title":"New Title"}`
+	req := httptest.NewRequest(http.MethodPut, "/quizzes/"+quizID.String(), strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+// --- AddQuestion: service error ---
+
+func TestQuizHandler_AddQuestion_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	svc.EXPECT().AddQuestion(mock.Anything, uid, quizID, mock.Anything).Return(nil, assert.AnError)
+
+	body := `{"question_type":"fill_blank","question_text":"Q?","correct_answer":"A"}`
+	req := httptest.NewRequest(http.MethodPost, "/quizzes/"+quizID.String()+"/questions", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+// --- DeleteQuestion: service error ---
+
+func TestQuizHandler_DeleteQuestion_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	questionID := uuid.New()
+	svc.EXPECT().DeleteQuestion(mock.Anything, uid, quizID, questionID).Return(domain.ErrForbidden)
+
+	req := httptest.NewRequest(http.MethodDelete, "/quizzes/"+quizID.String()+"/questions/"+questionID.String(), nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+// --- CreateQuiz: service error ---
+
+func TestQuizHandler_CreateQuiz_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().CreateQuiz(mock.Anything, uid, mock.Anything).Return(nil, domain.ErrForbidden)
+
+	body := `{"title":"My Quiz","quiz_type":"mcq"}`
+	req := httptest.NewRequest(http.MethodPost, "/quizzes", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+// --- CompleteAttempt: service error ---
+
+func TestQuizHandler_CompleteAttempt_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	attemptID := uuid.New()
+	svc.EXPECT().CompleteAttempt(mock.Anything, uid, attemptID).Return(nil, domain.ErrForbidden)
+
+	req := httptest.NewRequest(http.MethodPost, "/attempts/"+attemptID.String()+"/complete", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+// --- UpdateQuestion: service error ---
+
+func TestQuizHandler_UpdateQuestion_ServiceError(t *testing.T) {
+	svc := mockport.NewMockQuizServicer(t)
+	h := NewQuizHandler(svc)
+	router := setupQuizRouter(h)
+
+	uid := uuid.New()
+	quizID := uuid.New()
+	questionID := uuid.New()
+	svc.EXPECT().UpdateQuestion(mock.Anything, uid, quizID, questionID, mock.Anything).Return(nil, domain.ErrForbidden)
+
+	body := `{"question_text":"Updated?"}`
+	req := httptest.NewRequest(http.MethodPut, "/quizzes/"+quizID.String()+"/questions/"+questionID.String(), strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
 }

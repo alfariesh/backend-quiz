@@ -489,3 +489,55 @@ func TestCardService_Suspend_Forbidden(t *testing.T) {
 	err := svc.Suspend(ctx, testUserID, testCardID, true)
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
+
+func TestCardService_ResetFSRS_DeckForbidden(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
+	ctx := context.Background()
+
+	cardRepo.On("GetByID", ctx, testCardID).Return(testCard(testCardID, testDeckID), nil)
+	deckRepo.On("GetByID", ctx, testDeckID).Return(testDeck(uuid.New(), testDeckID), nil)
+
+	_, err := svc.ResetFSRS(ctx, testUserID, testCardID)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestCardService_ResetFSRS_DeckError(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
+	ctx := context.Background()
+
+	cardRepo.On("GetByID", ctx, testCardID).Return(testCard(testCardID, testDeckID), nil)
+	deckRepo.On("GetByID", ctx, testDeckID).Return(nil, assert.AnError)
+
+	_, err := svc.ResetFSRS(ctx, testUserID, testCardID)
+	assert.Error(t, err)
+}
+
+func TestCardService_Delete_DeckError(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
+	ctx := context.Background()
+
+	cardRepo.On("GetByID", ctx, testCardID).Return(testCard(testCardID, testDeckID), nil)
+	deckRepo.On("GetByID", ctx, testDeckID).Return(nil, assert.AnError)
+
+	err := svc.Delete(ctx, testUserID, testCardID)
+	assert.Error(t, err)
+}
+
+func TestCardService_Suspend_DeckError(t *testing.T) {
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	svc := NewCardService(cardRepo, deckRepo)
+	ctx := context.Background()
+
+	cardRepo.On("GetByID", ctx, testCardID).Return(testCard(testCardID, testDeckID), nil)
+	deckRepo.On("GetByID", ctx, testDeckID).Return(nil, assert.AnError)
+
+	err := svc.Suspend(ctx, testUserID, testCardID, true)
+	assert.Error(t, err)
+}

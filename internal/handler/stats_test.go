@@ -334,6 +334,57 @@ func TestStatsHandler_Leaderboard_ServiceError(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
+func TestStatsHandler_DeckStats_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStatsServicer(t)
+	h := NewStatsHandler(svc)
+	router := setupStatsRouter(h)
+
+	uid := uuid.New()
+	deckID := uuid.New()
+	svc.EXPECT().DeckStats(mock.Anything, uid, deckID).Return(nil, domain.ErrNotFound)
+
+	req := httptest.NewRequest(http.MethodGet, "/stats/decks/"+deckID.String(), nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestStatsHandler_TestComparison_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStatsServicer(t)
+	h := NewStatsHandler(svc)
+	router := setupStatsRouter(h)
+
+	uid := uuid.New()
+	deckID := uuid.New()
+	svc.EXPECT().TestComparison(mock.Anything, uid, deckID).Return(nil, domain.ErrNotFound)
+
+	req := httptest.NewRequest(http.MethodGet, "/stats/decks/"+deckID.String()+"/comparison", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestStatsHandler_Mastery_NilResult(t *testing.T) {
+	svc := mockport.NewMockStatsServicer(t)
+	h := NewStatsHandler(svc)
+	router := setupStatsRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().Mastery(mock.Anything, uid).Return(nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/stats/mastery", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "[]")
+}
+
 func TestStatsHandler_TestComparison_InvalidDeckID(t *testing.T) {
 	svc := mockport.NewMockStatsServicer(t)
 	h := NewStatsHandler(svc)

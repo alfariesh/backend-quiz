@@ -85,6 +85,23 @@ func TestDeckHandler_Create_ValidationError(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
+func TestDeckHandler_Create_ServiceError(t *testing.T) {
+	svc := mockport.NewMockDeckServicer(t)
+	h := NewDeckHandler(svc)
+	router := setupDeckRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().Create(mock.Anything, uid, mock.Anything).Return(nil, assert.AnError)
+
+	body := `{"name":"Test Deck"}`
+	req := httptest.NewRequest(http.MethodPost, "/decks", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
 func TestDeckHandler_Get_Success(t *testing.T) {
 	svc := mockport.NewMockDeckServicer(t)
 	h := NewDeckHandler(svc)
@@ -503,4 +520,117 @@ func TestDeckHandler_Import_ValidationError(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestDeckHandler_Update_InvalidID(t *testing.T) {
+	svc := mockport.NewMockDeckServicer(t)
+	h := NewDeckHandler(svc)
+	router := setupDeckRouter(h)
+
+	body := `{"name":"New Name"}`
+	req := httptest.NewRequest(http.MethodPut, "/decks/not-a-uuid", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uuid.New()))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestDeckHandler_Update_InvalidBody(t *testing.T) {
+	svc := mockport.NewMockDeckServicer(t)
+	h := NewDeckHandler(svc)
+	router := setupDeckRouter(h)
+
+	deckID := uuid.New()
+	req := httptest.NewRequest(http.MethodPut, "/decks/"+deckID.String(), strings.NewReader(`not json`))
+	req = req.WithContext(ctxWithUserID(uuid.New()))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestDeckHandler_Update_ServiceError(t *testing.T) {
+	svc := mockport.NewMockDeckServicer(t)
+	h := NewDeckHandler(svc)
+	router := setupDeckRouter(h)
+
+	uid := uuid.New()
+	deckID := uuid.New()
+	svc.EXPECT().Update(mock.Anything, uid, deckID, mock.Anything).Return(nil, domain.ErrNotFound)
+
+	body := `{"name":"New Name"}`
+	req := httptest.NewRequest(http.MethodPut, "/decks/"+deckID.String(), strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestDeckHandler_List_ServiceError(t *testing.T) {
+	svc := mockport.NewMockDeckServicer(t)
+	h := NewDeckHandler(svc)
+	router := setupDeckRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().List(mock.Anything, uid, mock.Anything, mock.Anything).Return(nil, 0, assert.AnError)
+
+	req := httptest.NewRequest(http.MethodGet, "/decks", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestDeckHandler_Delete_ServiceError(t *testing.T) {
+	svc := mockport.NewMockDeckServicer(t)
+	h := NewDeckHandler(svc)
+	router := setupDeckRouter(h)
+
+	uid := uuid.New()
+	deckID := uuid.New()
+	svc.EXPECT().Delete(mock.Anything, uid, deckID).Return(domain.ErrForbidden)
+
+	req := httptest.NewRequest(http.MethodDelete, "/decks/"+deckID.String(), nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestDeckHandler_Unshare_ServiceError(t *testing.T) {
+	svc := mockport.NewMockDeckServicer(t)
+	h := NewDeckHandler(svc)
+	router := setupDeckRouter(h)
+
+	uid := uuid.New()
+	deckID := uuid.New()
+	svc.EXPECT().Unshare(mock.Anything, uid, deckID).Return(domain.ErrForbidden)
+
+	req := httptest.NewRequest(http.MethodDelete, "/decks/"+deckID.String()+"/share", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestDeckHandler_Import_ServiceError(t *testing.T) {
+	svc := mockport.NewMockDeckServicer(t)
+	h := NewDeckHandler(svc)
+	router := setupDeckRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().Import(mock.Anything, uid, mock.Anything).Return(nil, assert.AnError)
+
+	body := `{"name":"Test","cards":[{"front":"Q","back":"A"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/decks/import", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 }

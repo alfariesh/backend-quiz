@@ -394,6 +394,57 @@ func TestStudyHandler_Reminders_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
+func TestStudyHandler_StartSession_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStudyServicer(t)
+	h := NewStudyHandler(svc)
+	router := setupStudyRouter(h)
+
+	uid := uuid.New()
+	deckID := uuid.New()
+	svc.EXPECT().StartSession(mock.Anything, uid, mock.Anything).Return(nil, domain.ErrNotFound)
+
+	body := `{"deck_id":"` + deckID.String() + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/study/sessions", strings.NewReader(body))
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestStudyHandler_EndSession_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStudyServicer(t)
+	h := NewStudyHandler(svc)
+	router := setupStudyRouter(h)
+
+	uid := uuid.New()
+	sessionID := uuid.New()
+	svc.EXPECT().EndSession(mock.Anything, uid, sessionID).Return(nil, domain.ErrNotFound)
+
+	req := httptest.NewRequest(http.MethodPost, "/study/sessions/"+sessionID.String()+"/end", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestStudyHandler_Reminders_ServiceError(t *testing.T) {
+	svc := mockport.NewMockStudyServicer(t)
+	h := NewStudyHandler(svc)
+	router := setupStudyRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().GetReminders(mock.Anything, uid, 24).Return(nil, assert.AnError)
+
+	req := httptest.NewRequest(http.MethodGet, "/study/reminders", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
 func TestStudyHandler_Reminders_CustomHours(t *testing.T) {
 	svc := mockport.NewMockStudyServicer(t)
 	h := NewStudyHandler(svc)

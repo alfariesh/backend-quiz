@@ -165,6 +165,38 @@ func TestMediaHandler_ListByCard_InvalidCardID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
+func TestMediaHandler_ListByCard_ServiceError(t *testing.T) {
+	svc := mockport.NewMockMediaServicer(t)
+	h := NewMediaHandler(svc)
+	router := setupMediaRouter(h)
+
+	uid := uuid.New()
+	cardID := uuid.New()
+	svc.EXPECT().ListByCard(mock.Anything, uid, cardID).Return(nil, domain.ErrForbidden)
+
+	req := httptest.NewRequest(http.MethodGet, "/cards/"+cardID.String()+"/media", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestMediaHandler_Upload_InvalidMultipartForm(t *testing.T) {
+	svc := mockport.NewMockMediaServicer(t)
+	h := NewMediaHandler(svc)
+	router := setupMediaRouter(h)
+
+	cardID := uuid.New()
+	req := httptest.NewRequest(http.MethodPost, "/cards/"+cardID.String()+"/media", bytes.NewReader([]byte("not multipart")))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(ctxWithUserID(uuid.New()))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
 // --- Delete ---
 
 func TestMediaHandler_Delete_Success(t *testing.T) {

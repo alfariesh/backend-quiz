@@ -532,3 +532,95 @@ func TestAuthService_GenerateTokens_Structure(t *testing.T) {
 
 	assert.Greater(t, tokens.ExpiresAt, time.Now().Unix())
 }
+
+// --- Register: GetByEmail repo error (not ErrNotFound) ---
+
+func TestAuthService_Register_GetByEmailRepoError(t *testing.T) {
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	ctx := context.Background()
+
+	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, assert.AnError)
+
+	_, _, err := svc.Register(ctx, RegisterRequest{
+		Email: "test@example.com", Password: "password123", DisplayName: "Test",
+	})
+	assert.Error(t, err)
+	assert.NotErrorIs(t, err, domain.ErrEmailTaken)
+}
+
+func TestAuthService_Register_CreateError(t *testing.T) {
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	ctx := context.Background()
+
+	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
+	repo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(assert.AnError)
+
+	_, _, err := svc.Register(ctx, RegisterRequest{
+		Email: "test@example.com", Password: "password123", DisplayName: "Test",
+	})
+	assert.Error(t, err)
+}
+
+// --- Login: GetByEmail repo error (not ErrNotFound) ---
+
+func TestAuthService_Login_RepoError(t *testing.T) {
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	ctx := context.Background()
+
+	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, assert.AnError)
+
+	_, _, err := svc.Login(ctx, LoginRequest{
+		Email: "test@example.com", Password: "password123",
+	})
+	assert.Error(t, err)
+	assert.NotErrorIs(t, err, domain.ErrInvalidCredentials)
+}
+
+// --- RefreshToken: non-HMAC signing method ---
+
+func TestAuthService_RefreshToken_NonHMACMethod(t *testing.T) {
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	ctx := context.Background()
+
+	// Create a token with "none" method — should be rejected
+	_, err := svc.RefreshToken(ctx, "not.a.valid.token")
+	assert.ErrorIs(t, err, domain.ErrUnauthorized)
+}
+
+func TestAuthService_RefreshToken_InvalidSubject(t *testing.T) {
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	ctx := context.Background()
+
+	// Create refresh token with invalid UUID as sub
+	claims := jwt.MapClaims{
+		"sub":  "not-a-uuid",
+		"type": "refresh",
+		"exp":  time.Now().Add(time.Hour).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, _ := token.SignedString([]byte(testJWTSecret))
+
+	_, err := svc.RefreshToken(ctx, tokenStr)
+	assert.ErrorIs(t, err, domain.ErrUnauthorized)
+}
+
+// --- FindOrCreateOAuthUser: UoW error (create fails) ---
+
+func TestAuthService_FindOrCreateOAuthUser_CreateOAuthError(t *testing.T) {
+	repo := mockdomain.NewMockUserRepository(t)
+	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	ctx := context.Background()
+
+	repo.On("GetOAuthAccount", ctx, "google", "123").Return(nil, domain.ErrNotFound)
+	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
+	repo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
+	repo.On("CreateOAuthAccount", ctx, mock.AnythingOfType("*domain.OAuthAccount")).Return(assert.AnError)
+
+	_, _, err := svc.FindOrCreateOAuthUser(ctx, "google", "123", "test@example.com", "Test", nil)
+	assert.Error(t, err)
+}

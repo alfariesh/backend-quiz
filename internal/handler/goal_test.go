@@ -146,6 +146,23 @@ func TestGoalHandler_ListWithProgress_Empty(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "[]")
 }
 
+func TestGoalHandler_ListWithProgress_NilResult(t *testing.T) {
+	svc := mockport.NewMockGoalServicer(t)
+	h := NewGoalHandler(svc)
+	router := setupGoalRouter(h)
+
+	uid := uuid.New()
+	svc.EXPECT().ListWithProgress(mock.Anything, uid).Return(nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/goals", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "[]")
+}
+
 // --- DeleteGoal ---
 
 func TestGoalHandler_DeleteGoal_Success(t *testing.T) {

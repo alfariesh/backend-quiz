@@ -473,3 +473,99 @@ func TestDeckService_Import_Success(t *testing.T) {
 	assert.Equal(t, 0, createdCards[0].Position)
 	assert.Equal(t, 1, createdCards[1].Position)
 }
+
+// --- Delete: not found ---
+
+func TestDeckService_Delete_NotFound(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	deckRepo.On("GetByID", ctx, deckID).Return(nil, domain.ErrNotFound)
+
+	err := svc.Delete(ctx, uuid.New(), deckID)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// --- Share: not found ---
+
+func TestDeckService_Share_NotFound(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	deckRepo.On("GetByID", ctx, deckID).Return(nil, domain.ErrNotFound)
+
+	_, err := svc.Share(ctx, uuid.New(), deckID, ShareDeckRequest{IsPublic: true})
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// --- Export: not found, cards error ---
+
+func TestDeckService_Export_NotFound(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	deckID := uuid.New()
+	deckRepo.On("GetByID", ctx, deckID).Return(nil, domain.ErrNotFound)
+
+	_, err := svc.Export(ctx, uuid.New(), deckID)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestDeckService_Export_CardListError(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	userID := uuid.New()
+	deckID := uuid.New()
+
+	deckRepo.On("GetByID", ctx, deckID).Return(&domain.Deck{ID: deckID, UserID: userID}, nil)
+	cardRepo.On("ListByDeckID", ctx, deckID, domain.CardFilter{}, 10000, 0).Return(nil, 0, assert.AnError)
+
+	_, err := svc.Export(ctx, userID, deckID)
+	assert.Error(t, err)
+}
+
+// --- Clone: GetByID error ---
+
+func TestDeckService_Clone_DeckNotFound(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	shareCode := "abc123"
+	deckID := uuid.New()
+
+	deckRepo.On("GetShareByCode", ctx, shareCode).Return(&domain.DeckShare{DeckID: deckID}, nil)
+	deckRepo.On("GetByID", ctx, deckID).Return(nil, domain.ErrNotFound)
+
+	_, err := svc.Clone(ctx, uuid.New(), shareCode)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// --- Import: UoW error ---
+
+func TestDeckService_Import_DeckCreateError(t *testing.T) {
+	deckRepo := mockdomain.NewMockDeckRepository(t)
+	cardRepo := mockdomain.NewMockCardRepository(t)
+	svc := NewDeckService(deckRepo, cardRepo, noopUoW{})
+	ctx := context.Background()
+
+	deckRepo.On("Create", ctx, mock.AnythingOfType("*domain.Deck")).Return(assert.AnError)
+
+	_, err := svc.Import(ctx, uuid.New(), ImportDeckRequest{
+		Name:  "Test",
+		Cards: []ExportCard{{Front: "Q", Back: "A"}},
+	})
+	assert.Error(t, err)
+}

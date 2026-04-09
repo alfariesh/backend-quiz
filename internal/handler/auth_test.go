@@ -120,6 +120,18 @@ func TestAuthHandler_Login_InvalidBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
+func TestAuthHandler_Login_ValidationError(t *testing.T) {
+	svc := mockport.NewMockAuthServicer(t)
+	h := NewAuthHandler(svc)
+
+	body := `{"email":"not-an-email"}`
+	req := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	h.Login(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
 func TestAuthHandler_Login_NotFound(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
 	h := NewAuthHandler(svc)
@@ -293,6 +305,55 @@ func TestAuthHandler_GoogleCallback_NotImplemented(t *testing.T) {
 
 	h.GoogleCallback(rec, req)
 	assert.Equal(t, http.StatusNotImplemented, rec.Code)
+}
+
+// --- Refresh: service error ---
+
+func TestAuthHandler_Refresh_ServiceError(t *testing.T) {
+	svc := mockport.NewMockAuthServicer(t)
+	h := NewAuthHandler(svc)
+
+	svc.EXPECT().RefreshToken(mock.Anything, "bad-token").Return(nil, domain.ErrUnauthorized)
+
+	body := `{"refresh_token":"bad-token"}`
+	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	h.Refresh(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+// --- Me: service error ---
+
+func TestAuthHandler_Me_ServiceError(t *testing.T) {
+	svc := mockport.NewMockAuthServicer(t)
+	h := NewAuthHandler(svc)
+
+	uid := uuid.New()
+	svc.EXPECT().GetProfile(mock.Anything, uid).Return(nil, assert.AnError)
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
+	req = req.WithContext(ctxWithUserID(uid))
+	rec := httptest.NewRecorder()
+
+	h.Me(rec, req)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+// --- Login: service error ---
+
+func TestAuthHandler_Login_ServiceError(t *testing.T) {
+	svc := mockport.NewMockAuthServicer(t)
+	h := NewAuthHandler(svc)
+
+	svc.EXPECT().Login(mock.Anything, mock.Anything).Return(nil, nil, domain.ErrInvalidCredentials)
+
+	body := `{"email":"test@example.com","password":"wrong"}`
+	req := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	h.Login(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
 func userID() uuid.UUID {
