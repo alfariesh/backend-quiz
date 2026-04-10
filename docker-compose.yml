@@ -27,6 +27,40 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build:
+      dockerfile: Dockerfile.migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/migrations:ro
+    command:
+      [
+        "-dir", "/migrations",
+        "postgres",
+        "postgres://flashcard:flashcard@postgres:5432/flashcard?sslmode=disable",
+        "up",
+      ]
+
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://flashcard:flashcard@postgres:5432/flashcard?sslmode=disable
+      REDIS_ADDR: redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:
