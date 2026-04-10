@@ -109,6 +109,7 @@ func run() error {
 
 	// Global middleware
 	rl := middleware.NewRateLimiter(10, 20)
+	r.Use(middleware.RequestID)
 	r.Use(middleware.Recovery(logger))
 	r.Use(middleware.Logging(logger))
 	r.Use(middleware.CORS)
