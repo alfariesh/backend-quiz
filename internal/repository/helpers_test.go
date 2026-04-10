@@ -65,21 +65,3 @@ func createTestAttempt(t *testing.T, pool *pgxpool.Pool, quizID, userID uuid.UUI
 	require.NoError(t, repo.Create(context.Background(), attempt))
 	return attempt
 }
-
-func createTestReview(t *testing.T, pool *pgxpool.Pool, cardID, userID uuid.UUID) *domain.ReviewLog {
-	t.Helper()
-	repo := NewReviewRepository(pool)
-	log := &domain.ReviewLog{
-		CardID:     cardID,
-		UserID:     userID,
-		Rating:     domain.RatingGood,
-		State:      domain.CardStateNew,
-		Stability:  1.0,
-		Difficulty: 5.0,
-		DurationMS: 3000,
-		Source:     domain.ReviewSourceFlashcard,
-		ReviewedAt: time.Now().UTC(),
-	}
-	require.NoError(t, repo.Create(context.Background(), log))
-	return log
-}
