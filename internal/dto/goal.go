@@ -1,6 +1,6 @@
 package dto
 
-import "github.com/rekanesiads/backend-quiz/internal/domain"
+import "github.com/alfariesh/backend-quiz/internal/domain"
 
 type SetGoalRequest struct {
 	GoalType    string `json:"goal_type" validate:"required,oneof=daily_reviews daily_new weekly_reviews daily_minutes"`

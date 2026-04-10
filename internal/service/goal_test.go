@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rekanesiads/backend-quiz/internal/domain"
-	"github.com/rekanesiads/backend-quiz/internal/dto"
-	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
+	"github.com/alfariesh/backend-quiz/internal/domain"
+	"github.com/alfariesh/backend-quiz/internal/dto"
+	mockdomain "github.com/alfariesh/backend-quiz/internal/mocks/domain"
 )
 
 // --- SetGoal ---

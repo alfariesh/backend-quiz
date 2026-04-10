@@ -5,8 +5,8 @@ package mockport
 import (
 	context "context"
 
-	domain "github.com/rekanesiads/backend-quiz/internal/domain"
-	dto "github.com/rekanesiads/backend-quiz/internal/dto"
+	domain "github.com/alfariesh/backend-quiz/internal/domain"
+	dto "github.com/alfariesh/backend-quiz/internal/dto"
 
 	mock "github.com/stretchr/testify/mock"
 

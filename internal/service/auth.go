@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/rekanesiads/backend-quiz/internal/domain"
-	"github.com/rekanesiads/backend-quiz/internal/dto"
-	"github.com/rekanesiads/backend-quiz/internal/port"
+	"github.com/alfariesh/backend-quiz/internal/domain"
+	"github.com/alfariesh/backend-quiz/internal/dto"
+	"github.com/alfariesh/backend-quiz/internal/port"
 )
 
 var _ port.AuthServicer = (*AuthService)(nil)

@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/rekanesiads/backend-quiz/internal/domain"
-	"github.com/rekanesiads/backend-quiz/internal/repository/sqlc"
+	"github.com/alfariesh/backend-quiz/internal/domain"
+	"github.com/alfariesh/backend-quiz/internal/repository/sqlc"
 )
 
 // UUID conversions

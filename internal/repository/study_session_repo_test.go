@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/alfariesh/backend-quiz/internal/domain"
 )
 
 func TestSessionRepo_CreateAndGet(t *testing.T) {

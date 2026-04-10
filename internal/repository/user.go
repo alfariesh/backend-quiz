@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/rekanesiads/backend-quiz/internal/domain"
-	"github.com/rekanesiads/backend-quiz/internal/repository/sqlc"
+	"github.com/alfariesh/backend-quiz/internal/domain"
+	"github.com/alfariesh/backend-quiz/internal/repository/sqlc"
 )
 
 func stringToTime(s string) pgtype.Time {

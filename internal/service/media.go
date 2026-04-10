@@ -8,10 +8,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/rekanesiads/backend-quiz/config"
-	"github.com/rekanesiads/backend-quiz/internal/domain"
-	"github.com/rekanesiads/backend-quiz/internal/dto"
-	"github.com/rekanesiads/backend-quiz/internal/port"
+	"github.com/alfariesh/backend-quiz/config"
+	"github.com/alfariesh/backend-quiz/internal/domain"
+	"github.com/alfariesh/backend-quiz/internal/dto"
+	"github.com/alfariesh/backend-quiz/internal/port"
 )
 
 var allowedMediaTypes = map[string]bool{

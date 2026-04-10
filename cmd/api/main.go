@@ -15,12 +15,12 @@ import (
 	"github.com/rs/zerolog"
 	slogzerolog "github.com/samber/slog-zerolog/v2"
 
-	"github.com/rekanesiads/backend-quiz/config"
-	"github.com/rekanesiads/backend-quiz/internal/handler"
-	"github.com/rekanesiads/backend-quiz/internal/middleware"
-	"github.com/rekanesiads/backend-quiz/internal/repository"
-	"github.com/rekanesiads/backend-quiz/internal/service"
-	"github.com/rekanesiads/backend-quiz/pkg/storage"
+	"github.com/alfariesh/backend-quiz/config"
+	"github.com/alfariesh/backend-quiz/internal/handler"
+	"github.com/alfariesh/backend-quiz/internal/middleware"
+	"github.com/alfariesh/backend-quiz/internal/repository"
+	"github.com/alfariesh/backend-quiz/internal/service"
+	"github.com/alfariesh/backend-quiz/pkg/storage"
 )
 
 func main() {

@@ -5,7 +5,7 @@ package mockdomain
 import (
 	context "context"
 
-	domain "github.com/rekanesiads/backend-quiz/internal/domain"
+	domain "github.com/alfariesh/backend-quiz/internal/domain"
 	mock "github.com/stretchr/testify/mock"
 
 	time "time"

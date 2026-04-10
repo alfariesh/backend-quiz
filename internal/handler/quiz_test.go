@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rekanesiads/backend-quiz/internal/domain"
-	"github.com/rekanesiads/backend-quiz/internal/dto"
-	mockport "github.com/rekanesiads/backend-quiz/internal/mocks/port"
+	"github.com/alfariesh/backend-quiz/internal/domain"
+	"github.com/alfariesh/backend-quiz/internal/dto"
+	mockport "github.com/alfariesh/backend-quiz/internal/mocks/port"
 )
 
 func setupQuizRouter(h *QuizHandler) *chi.Mux {

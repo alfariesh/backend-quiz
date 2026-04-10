@@ -9,8 +9,8 @@ import (
 	"github.com/rs/zerolog"
 	slogzerolog "github.com/samber/slog-zerolog/v2"
 
-	"github.com/rekanesiads/backend-quiz/config"
-	"github.com/rekanesiads/backend-quiz/internal/worker"
+	"github.com/alfariesh/backend-quiz/config"
+	"github.com/alfariesh/backend-quiz/internal/worker"
 )
 
 func main() {

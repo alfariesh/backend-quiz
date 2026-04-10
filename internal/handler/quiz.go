@@ -6,11 +6,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
-	"github.com/rekanesiads/backend-quiz/internal/dto"
-	"github.com/rekanesiads/backend-quiz/internal/middleware"
-	"github.com/rekanesiads/backend-quiz/internal/port"
-	"github.com/rekanesiads/backend-quiz/pkg/pagination"
-	"github.com/rekanesiads/backend-quiz/pkg/validate"
+	"github.com/alfariesh/backend-quiz/internal/dto"
+	"github.com/alfariesh/backend-quiz/internal/middleware"
+	"github.com/alfariesh/backend-quiz/internal/port"
+	"github.com/alfariesh/backend-quiz/pkg/pagination"
+	"github.com/alfariesh/backend-quiz/pkg/validate"
 )
 
 type QuizHandler struct {

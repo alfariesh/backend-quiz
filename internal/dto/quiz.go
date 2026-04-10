@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/alfariesh/backend-quiz/internal/domain"
 )
 
 type CreateQuizRequest struct {
