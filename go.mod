@@ -1,4 +1,4 @@
-module github.com/rekanesiads/backend-quiz
+module github.com/alfariesh/backend-quiz
 
 go 1.25.0
 

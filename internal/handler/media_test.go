@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/rekanesiads/backend-quiz/internal/domain"
-	mockport "github.com/rekanesiads/backend-quiz/internal/mocks/port"
+	"github.com/alfariesh/backend-quiz/internal/domain"
+	mockport "github.com/alfariesh/backend-quiz/internal/mocks/port"
 )
 
 func setupMediaRouter(h *MediaHandler) *chi.Mux {

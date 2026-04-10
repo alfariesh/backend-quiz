@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rekanesiads/backend-quiz/internal/domain"
+	"github.com/alfariesh/backend-quiz/internal/domain"
 )
 
 func createTestDeck(t *testing.T, pool *pgxpool.Pool, userID uuid.UUID, name string) *domain.Deck {

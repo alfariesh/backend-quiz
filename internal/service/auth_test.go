@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/rekanesiads/backend-quiz/internal/domain"
-	"github.com/rekanesiads/backend-quiz/internal/dto"
-	mockdomain "github.com/rekanesiads/backend-quiz/internal/mocks/domain"
+	"github.com/alfariesh/backend-quiz/internal/domain"
+	"github.com/alfariesh/backend-quiz/internal/dto"
+	mockdomain "github.com/alfariesh/backend-quiz/internal/mocks/domain"
 )
 
 const testJWTSecret = "test-secret-key-for-testing"
