@@ -31,14 +31,18 @@ func Logging(logger *slog.Logger) func(http.Handler) http.Handler {
 
 			next.ServeHTTP(rw, r)
 
-			logger.Info("request",
+			attrs := []slog.Attr{
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.Int("status", rw.status),
 				slog.Int("size", rw.size),
 				slog.Duration("duration", time.Since(start)),
 				slog.String("remote", r.RemoteAddr),
-			)
+			}
+			if rid := GetRequestID(r.Context()); rid != "" {
+				attrs = append(attrs, slog.String("request_id", rid))
+			}
+			logger.LogAttrs(r.Context(), slog.LevelInfo, "request", attrs...)
 		})
 	}
 }
