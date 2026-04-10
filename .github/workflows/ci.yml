@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version-file: go.mod
 
       - name: Build
         run: go build ./...
@@ -29,7 +29,7 @@ jobs:
           version: "latest"
 
       - name: Test
-        run: go test ./... -race -coverprofile=coverage.out -covermode=atomic
+        run: go test ./... -race -short -coverprofile=coverage.out -covermode=atomic
 
       - name: Check coverage
         run: |
@@ -40,3 +40,21 @@ jobs:
             echo "::error::Coverage ${total}% is below threshold ${threshold}%"
             exit 1
           fi
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/backend-quiz
+            git pull origin dev
+            docker compose up --build -d
+            docker compose ps
