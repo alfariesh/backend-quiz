@@ -2,10 +2,12 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -16,13 +18,21 @@ import (
 )
 
 type RAGHandler struct {
-	svc     port.RAGServicer
-	baseURL string
-	client  *http.Client
+	svc           port.RAGServicer
+	baseURL       string
+	internalToken string
+	streamTimeout time.Duration
+	client        *http.Client
 }
 
-func NewRAGHandler(svc port.RAGServicer, baseURL string, client *http.Client) *RAGHandler {
-	return &RAGHandler{svc: svc, baseURL: baseURL, client: client}
+func NewRAGHandler(svc port.RAGServicer, baseURL, internalToken string, streamTimeout time.Duration, client *http.Client) *RAGHandler {
+	return &RAGHandler{
+		svc:           svc,
+		baseURL:       baseURL,
+		internalToken: internalToken,
+		streamTimeout: streamTimeout,
+		client:        client,
+	}
 }
 
 func (h *RAGHandler) Query(w http.ResponseWriter, r *http.Request) {
@@ -77,6 +87,10 @@ func (h *RAGHandler) QueryStream(w http.ResponseWriter, r *http.Request) {
 		JSONError(w, http.StatusBadRequest, "kitab_id required for per_kitab mode")
 		return
 	}
+	if err := h.svc.CheckDailyLimit(r.Context(), userID); err != nil {
+		HandleError(w, err)
+		return
+	}
 	if req.ConversationID != nil {
 		if err := h.svc.VerifyConversationOwner(r.Context(), userID, *req.ConversationID); err != nil {
 			HandleError(w, err)
@@ -96,8 +110,11 @@ func (h *RAGHandler) QueryStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// No timeout on the upstream client for SSE — the request context governs cancellation.
-	streamCtx := r.Context()
+	// Cap stream lifetime so a hung client can't hold a goroutine + upstream
+	// connection forever. Cancellation propagates to the upstream HTTP call.
+	streamCtx, cancel := context.WithTimeout(r.Context(), h.streamTimeout)
+	defer cancel()
+
 	upstreamReq, err := http.NewRequestWithContext(streamCtx, http.MethodPost, h.baseURL+"/query/stream", bytes.NewReader(buf))
 	if err != nil {
 		JSONError(w, http.StatusInternalServerError, "build upstream request")
@@ -105,6 +122,9 @@ func (h *RAGHandler) QueryStream(w http.ResponseWriter, r *http.Request) {
 	}
 	upstreamReq.Header.Set("Content-Type", "application/json")
 	upstreamReq.Header.Set("Accept", "text/event-stream")
+	if h.internalToken != "" {
+		upstreamReq.Header.Set("X-Internal-Token", h.internalToken)
+	}
 
 	resp, err := h.client.Do(upstreamReq)
 	if err != nil {

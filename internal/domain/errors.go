@@ -14,7 +14,8 @@ var (
 	ErrSessionEnded      = errors.New("study session already ended")
 	ErrCardNotInDeck     = errors.New("card does not belong to this deck")
 	ErrCardSuspended     = errors.New("card is suspended")
-	ErrDailyLimitReached = errors.New("daily limit reached")
+	ErrDailyLimitReached    = errors.New("daily limit reached")
+	ErrRAGDailyLimitReached = errors.New("daily RAG query limit reached")
 	ErrFileTooLarge      = errors.New("file too large")
 	ErrUnsupportedMedia  = errors.New("unsupported media type")
 

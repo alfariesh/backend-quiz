@@ -117,8 +117,13 @@ type CaptchaConfig struct {
 func (c CaptchaConfig) Enabled() bool { return c.TurnstileSecret != "" }
 
 type RAGConfig struct {
-	ServiceURL string        `envconfig:"RAG_SERVICE_URL" default:"http://localhost:8001"`
-	Timeout    time.Duration `envconfig:"RAG_TIMEOUT" default:"120s"`
+	ServiceURL    string        `envconfig:"RAG_SERVICE_URL" default:"http://localhost:8001"`
+	Timeout       time.Duration `envconfig:"RAG_TIMEOUT" default:"120s"`
+	InternalToken string        `envconfig:"RAG_INTERNAL_TOKEN"`
+	StreamTimeout time.Duration `envconfig:"RAG_STREAM_TIMEOUT" default:"3m"`
+	UserRPS       float64       `envconfig:"RAG_USER_RPS" default:"0.5"`
+	UserBurst     int           `envconfig:"RAG_USER_BURST" default:"3"`
+	DailyLimit    int           `envconfig:"RAG_DAILY_LIMIT" default:"100"`
 }
 
 func Load() (*Config, error) {

@@ -271,7 +271,7 @@ def _vector_candidates_all_kitab(query_vec: list[float], limit: int) -> list[Ret
             FROM kitab_chunks kc
             JOIN kitab_tree t ON t.id = kc.tree_node_id
             JOIN kitab k ON k.id = kc.kitab_id
-            WHERE k.is_published = true OR k.embeddings_processed = true
+            WHERE k.is_published = true AND k.embeddings_processed = true
             ORDER BY kc.embedding <=> %s::vector
             LIMIT %s
             """,

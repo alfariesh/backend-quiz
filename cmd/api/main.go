@@ -147,7 +147,7 @@ func run() error {
 	r2Client := storage.NewR2Client(cfg.R2.AccountID, cfg.R2.AccessKeyID, cfg.R2.SecretAccessKey, cfg.R2.BucketName, cfg.R2.PublicURL)
 	mediaSvc := service.NewMediaService(mediaRepo, cardRepo, deckRepo, r2Client, cfg.R2)
 	goalSvc := service.NewGoalService(goalRepo, reviewRepo)
-	ragSvc := service.NewRAGService(pool, cfg.RAG.ServiceURL, cfg.RAG.Timeout)
+	ragSvc := service.NewRAGService(pool, cfg.RAG.ServiceURL, cfg.RAG.InternalToken, cfg.RAG.Timeout, cfg.RAG.DailyLimit)
 
 	// Handlers
 	healthH := handler.NewHealthHandler(pool)
@@ -167,7 +167,7 @@ func run() error {
 	goalH := handler.NewGoalHandler(goalSvc)
 	// SSE passes through the handler's own client (no request timeout; streams can run long).
 	ragStreamClient := &http.Client{}
-	ragH := handler.NewRAGHandler(ragSvc, cfg.RAG.ServiceURL, ragStreamClient)
+	ragH := handler.NewRAGHandler(ragSvc, cfg.RAG.ServiceURL, cfg.RAG.InternalToken, cfg.RAG.StreamTimeout, ragStreamClient)
 
 	// Router
 	r := chi.NewRouter()
@@ -317,8 +317,12 @@ func run() error {
 				r.Delete("/{goalID}", goalH.DeleteGoal)
 			})
 
-			// RAG (proxy → Python rag-service)
+			// RAG (proxy → Python rag-service). Per-user rate limit on top of
+			// the global IP limit — RAG calls cost LLM tokens, so we keep them
+			// tight per authenticated user.
+			ragUserRL := middleware.NewUserRateLimiter(cfg.RAG.UserRPS, cfg.RAG.UserBurst)
 			r.Route("/rag", func(r chi.Router) {
+				r.Use(ragUserRL.Middleware)
 				r.Post("/query", ragH.Query)
 				r.Post("/query/stream", ragH.QueryStream)
 			})

@@ -8,19 +8,22 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException  # noqa: E402
+from fastapi import FastAPI, HTTPException, Request  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 from sse_starlette.sse import EventSourceResponse  # noqa: E402
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.responses import JSONResponse  # noqa: E402
 
 from db import (  # noqa: E402
     close_pool, create_conversation, init_pool,
     load_history, save_assistant_message, save_user_message,
 )
-from llm import chat, chat_stream  # noqa: E402
+from llm import chat  # noqa: E402
 from retrieval import RetrievalResult, retrieve_general, retrieve_per_kitab  # noqa: E402
 
 
 CONVERSATION_HISTORY_TURNS = int(os.getenv("CONVERSATION_HISTORY_TURNS", "6"))
+INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN", "")
 
 STYLE_INSTRUCTIONS = {
     "ringkas": "Answer very briefly (1-3 sentences). Get to the point.",
@@ -37,6 +40,23 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Surau RAG service", lifespan=lifespan)
+
+
+class InternalTokenMiddleware(BaseHTTPMiddleware):
+    """
+    Reject requests missing a shared internal token, except /health.
+    When INTERNAL_AUTH_TOKEN is unset (dev default), check is disabled.
+    This service is meant to sit behind the Go backend — never exposed publicly.
+    """
+    async def dispatch(self, request: Request, call_next):
+        if not INTERNAL_AUTH_TOKEN or request.url.path == "/health":
+            return await call_next(request)
+        if request.headers.get("x-internal-token") != INTERNAL_AUTH_TOKEN:
+            return JSONResponse(status_code=401, content={"detail": "internal token required"})
+        return await call_next(request)
+
+
+app.add_middleware(InternalTokenMiddleware)
 
 
 class QueryRequest(BaseModel):

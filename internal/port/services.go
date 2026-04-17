@@ -112,4 +112,5 @@ type GoalServicer interface {
 type RAGServicer interface {
 	Query(ctx context.Context, userID uuid.UUID, req dto.RAGQueryRequest) (*domain.RAGQueryResult, error)
 	VerifyConversationOwner(ctx context.Context, userID, conversationID uuid.UUID) error
+	CheckDailyLimit(ctx context.Context, userID uuid.UUID) error
 }

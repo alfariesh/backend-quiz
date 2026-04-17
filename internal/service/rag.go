@@ -22,18 +22,24 @@ import (
 var _ port.RAGServicer = (*RAGService)(nil)
 
 type RAGService struct {
-	pool    *pgxpool.Pool
-	baseURL string
-	client  *http.Client
+	pool          *pgxpool.Pool
+	baseURL       string
+	internalToken string
+	dailyLimit    int
+	client        *http.Client
 }
 
-func NewRAGService(pool *pgxpool.Pool, baseURL string, timeout time.Duration) *RAGService {
+func NewRAGService(pool *pgxpool.Pool, baseURL, internalToken string, timeout time.Duration, dailyLimit int) *RAGService {
 	return &RAGService{
-		pool:    pool,
-		baseURL: baseURL,
-		client:  &http.Client{Timeout: timeout},
+		pool:          pool,
+		baseURL:       baseURL,
+		internalToken: internalToken,
+		dailyLimit:    dailyLimit,
+		client:        &http.Client{Timeout: timeout},
 	}
 }
+
+func (s *RAGService) InternalToken() string { return s.internalToken }
 
 func (s *RAGService) VerifyConversationOwner(ctx context.Context, userID, conversationID uuid.UUID) error {
 	var owner uuid.UUID
@@ -52,6 +58,31 @@ func (s *RAGService) VerifyConversationOwner(ctx context.Context, userID, conver
 	return nil
 }
 
+// CheckDailyLimit counts a user's question messages in the last 24 hours
+// across all their conversations. Returns ErrRAGDailyLimitReached when the
+// configured cap is exceeded. A non-positive dailyLimit disables the check.
+func (s *RAGService) CheckDailyLimit(ctx context.Context, userID uuid.UUID) error {
+	if s.dailyLimit <= 0 {
+		return nil
+	}
+	var count int
+	err := s.pool.QueryRow(ctx, `
+		SELECT count(*) FROM messages m
+		JOIN conversations c ON c.id = m.conversation_id
+		WHERE c.user_id = $1 AND m.role = 'user' AND m.created_at > now() - interval '24 hours'
+	`, userID).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("count daily messages: %w", err)
+	}
+	if count >= s.dailyLimit {
+		return domain.NewAppErrorf(
+			domain.ErrRAGDailyLimitReached, domain.CodeTooManyRequests,
+			"daily RAG query limit reached (%d/%d)", count, s.dailyLimit,
+		)
+	}
+	return nil
+}
+
 // upstreamRequest is the wire format accepted by the Python rag-service.
 // kept private to this package so the Go API can evolve independently.
 type upstreamRequest struct {
@@ -65,6 +96,9 @@ type upstreamRequest struct {
 }
 
 func (s *RAGService) Query(ctx context.Context, userID uuid.UUID, req dto.RAGQueryRequest) (*domain.RAGQueryResult, error) {
+	if err := s.CheckDailyLimit(ctx, userID); err != nil {
+		return nil, err
+	}
 	if req.ConversationID != nil {
 		if err := s.VerifyConversationOwner(ctx, userID, *req.ConversationID); err != nil {
 			return nil, err
@@ -99,6 +133,9 @@ func (s *RAGService) Query(ctx context.Context, userID uuid.UUID, req dto.RAGQue
 		return nil, fmt.Errorf("build rag request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	if s.internalToken != "" {
+		httpReq.Header.Set("X-Internal-Token", s.internalToken)
+	}
 
 	resp, err := s.client.Do(httpReq)
 	if err != nil {

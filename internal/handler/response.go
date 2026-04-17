@@ -84,7 +84,8 @@ func HandleError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrQuizNotPublished),
 		errors.Is(err, domain.ErrInsufficientCards):
 		JSONError(w, http.StatusBadRequest, err.Error())
-	case errors.Is(err, domain.ErrDailyLimitReached):
+	case errors.Is(err, domain.ErrDailyLimitReached),
+		errors.Is(err, domain.ErrRAGDailyLimitReached):
 		JSONError(w, http.StatusTooManyRequests, err.Error())
 	default:
 		JSONError(w, http.StatusInternalServerError, "internal server error")
