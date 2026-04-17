@@ -58,6 +58,14 @@ def create_conversation(
         return str(cur.fetchone()[0])
 
 
+def update_conversation_title(conversation_id: str, title: str) -> None:
+    with conn() as c, c.cursor() as cur:
+        cur.execute(
+            "UPDATE conversations SET title = %s WHERE id = %s",
+            (title[:120], conversation_id),
+        )
+
+
 def load_history(conversation_id: str, turns: int) -> list[dict]:
     """Return messages oldest-first, capped at last `turns*2` rows."""
     with conn() as c, c.cursor() as cur:

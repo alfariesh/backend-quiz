@@ -17,6 +17,7 @@ from starlette.responses import JSONResponse  # noqa: E402
 from db import (  # noqa: E402
     close_pool, create_conversation, init_pool,
     load_history, save_assistant_message, save_user_message,
+    update_conversation_title,
 )
 from llm import chat  # noqa: E402
 from retrieval import RetrievalResult, retrieve_general, retrieve_per_kitab  # noqa: E402
@@ -24,6 +25,13 @@ from retrieval import RetrievalResult, retrieve_general, retrieve_per_kitab  # n
 
 CONVERSATION_HISTORY_TURNS = int(os.getenv("CONVERSATION_HISTORY_TURNS", "6"))
 INTERNAL_AUTH_TOKEN = os.getenv("INTERNAL_AUTH_TOKEN", "")
+TITLE_PLACEHOLDER = "New conversation"
+# Small/cheap model for the background title-generation job.
+# Falls back to LLM_MODEL (the answer model) if unset.
+LLM_TITLE_MODEL = os.getenv("LLM_TITLE_MODEL", "mistralai/mistral-nemo")
+
+# Bounded executor so title regeneration cannot fork unbounded threads under load.
+_title_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="title-regen")
 
 STYLE_INSTRUCTIONS = {
     "ringkas": "Answer very briefly (1-3 sentences). Get to the point.",
@@ -36,6 +44,7 @@ STYLE_INSTRUCTIONS = {
 async def lifespan(_app: FastAPI):
     init_pool()
     yield
+    _title_executor.shutdown(wait=False, cancel_futures=True)
     close_pool()
 
 
@@ -163,17 +172,55 @@ def _to_citations(result: RetrievalResult) -> list[Citation]:
     ]
 
 
-def _ensure_conversation(req: QueryRequest) -> str | None:
+def _ensure_conversation(req: QueryRequest) -> tuple[str | None, bool]:
+    """Return (conversation_id, is_new). is_new=True means a fresh row was just created."""
     if not req.user_id:
-        return None
+        return None, False
     if req.conversation_id:
-        return req.conversation_id
-    return create_conversation(
+        return req.conversation_id, False
+    conv_id = create_conversation(
         user_id=req.user_id, mode=req.mode, style=req.style,
         scope_kitab_id=req.kitab_id if req.mode == "per_kitab" else None,
         scope_fatwa_id=None,
-        title=(req.question[:120]),
+        title=TITLE_PLACEHOLDER,
     )
+    return conv_id, True
+
+
+def _generate_title(question: str, answer: str) -> str:
+    """Ask the LLM for a short descriptive title. Returns "" on any failure."""
+    try:
+        prompt = (
+            "Produce a concise conversation title (max 8 words, no quotes, no trailing period) "
+            "that summarizes what the user is asking about. Reply with the title only.\n\n"
+            f"User question: {question}\n\nAssistant answer: {answer}"
+        )
+        content, _ = chat(
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            model=LLM_TITLE_MODEL or None,
+        )
+        title = (content or "").strip().strip('"').strip("'")
+        return title[:120]
+    except Exception:
+        return ""
+
+
+def _regen_title_job(conv_id: str, question: str, answer: str) -> None:
+    title = _generate_title(question, answer)
+    if title:
+        try:
+            update_conversation_title(conv_id, title)
+        except Exception:
+            pass
+
+
+def _schedule_title_regen(conv_id: str, question: str, answer: str) -> None:
+    try:
+        _title_executor.submit(_regen_title_job, conv_id, question, answer)
+    except RuntimeError:
+        # executor already shut down during app teardown; nothing to do.
+        pass
 
 
 def _parse_structured(content: str) -> tuple[list[dict], str, list[str]]:
@@ -201,7 +248,7 @@ def query(req: QueryRequest):
     if req.style not in STYLE_INSTRUCTIONS:
         raise HTTPException(400, f"invalid style: {req.style}")
 
-    conv_id = _ensure_conversation(req)
+    conv_id, conv_is_new = _ensure_conversation(req)
     if conv_id:
         save_user_message(conv_id, req.question)
 
@@ -253,6 +300,8 @@ def query(req: QueryRequest):
             token_usage=usage,
             latency_ms=latency_ms,
         )
+        if conv_is_new and answer:
+            _schedule_title_regen(conv_id, req.question, answer)
 
     return QueryResponse(
         conversation_id=conv_id,
@@ -277,7 +326,7 @@ def query_stream(req: QueryRequest):
 
     async def event_gen():
         t0 = time.time()
-        conv_id = _ensure_conversation(req)
+        conv_id, conv_is_new = _ensure_conversation(req)
         if conv_id:
             save_user_message(conv_id, req.question)
             yield {"event": "conversation", "data": json.dumps({"id": conv_id})}
@@ -331,6 +380,8 @@ def query_stream(req: QueryRequest):
                 retrieval_strategy=result.strategy,
                 token_usage={}, latency_ms=latency_ms,
             )
+            if conv_is_new and answer:
+                _schedule_title_regen(conv_id, req.question, answer)
         yield {"event": "done", "data": json.dumps({"latency_ms": latency_ms})}
 
     return EventSourceResponse(event_gen())

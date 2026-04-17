@@ -52,10 +52,26 @@ services:
     environment:
       DATABASE_URL: postgres://flashcard:flashcard@postgres:5432/flashcard?sslmode=disable
       REDIS_ADDR: redis:6379
+      RAG_SERVICE_URL: http://rag-service:8001
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  rag-service:
+    build: ./rag-service
+    env_file:
+      - ./rag-service/.env
+    environment:
+      DATABASE_URL: postgres://flashcard:flashcard@postgres:5432/flashcard?sslmode=disable
+      HOST: 0.0.0.0
+      PORT: 8001
+    depends_on:
+      postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
