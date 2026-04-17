@@ -136,7 +136,7 @@ You must follow a STRICT two-stage protocol inside a single JSON response:
 
 STAGE 1 — EXTRACT: Scan the provided [Kutipan N] blocks. Find sentences (in ARABIC, verbatim, character-for-character copy-paste from the blocks) that directly answer the user's question. Do NOT paraphrase, do NOT add diacritics not in the source, do NOT translate, do NOT invent any Arabic text. If a sentence contains a number (e.g., 80, 100, 1000 times; years; rakaat), copy it exactly.
 
-STAGE 2 — ANSWER: Compose the answer in {"English" if req.style != "syarah" else "English with inline Arabic quotations"}, based STRICTLY on the Stage 1 extracts. Never introduce facts not present in Stage 1. Cite quotes using [Kutipan N].
+STAGE 2 — ANSWER: Detect the language of the user's question. Compose the answer in THAT SAME LANGUAGE (e.g. Indonesian question → Indonesian answer; English question → English answer). Keep Arabic quotations inline in Arabic regardless. Base the answer STRICTLY on the Stage 1 extracts. Never introduce facts not present in Stage 1. Cite quotes using [Kutipan N]. Write `suggested_questions` in the same language as the user's question.
 
 Also produce 3 suggested follow-up questions a student might ask next.
 
@@ -151,7 +151,7 @@ Output JSON only, matching this schema exactly:
     {{"kutipan_n": 1, "text_arabic": "verbatim Arabic sentence copied from [Kutipan 1]"}},
     ...
   ],
-  "answer": "English answer citing [Kutipan N] for each claim",
+  "answer": "Answer in the user's question language, citing [Kutipan N] for each claim",
   "suggested_questions": ["q1", "q2", "q3"]
 }}
 
