@@ -60,6 +60,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      rag-service:
+        condition: service_healthy
     restart: unless-stopped
 
   rag-service:
@@ -70,11 +72,20 @@ services:
       DATABASE_URL: postgres://flashcard:flashcard@postgres:5432/flashcard?sslmode=disable
       HOST: 0.0.0.0
       PORT: 8001
+      # Shared secret with Go api. Source of truth: root .env (RAG_INTERNAL_TOKEN).
+      # Empty string disables the check — do not leave empty in production.
+      INTERNAL_AUTH_TOKEN: ${RAG_INTERNAL_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health',timeout=2).status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
 
 volumes:
