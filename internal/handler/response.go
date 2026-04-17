@@ -51,8 +51,26 @@ func HandleError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrDeckNameTaken):
 		JSONError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, domain.ErrUnauthorized),
-		errors.Is(err, domain.ErrInvalidCredentials):
+		errors.Is(err, domain.ErrInvalidCredentials),
+		errors.Is(err, domain.ErrRefreshTokenInvalid),
+		errors.Is(err, domain.ErrRefreshTokenReuse),
+		errors.Is(err, domain.ErrResetTokenInvalid),
+		errors.Is(err, domain.ErrOTPInvalid),
+		errors.Is(err, domain.ErrOTPTooManyAttempts),
+		errors.Is(err, domain.ErrEmailNotVerified):
 		JSONError(w, http.StatusUnauthorized, err.Error())
+	case errors.Is(err, domain.ErrAccountLocked):
+		JSONError(w, http.StatusTooManyRequests, err.Error())
+	case errors.Is(err, domain.ErrEmailAlreadyVerified),
+		errors.Is(err, domain.ErrPasswordSameAsOld),
+		errors.Is(err, domain.ErrPasswordTooWeak),
+		errors.Is(err, domain.ErrPasswordCompromised),
+		errors.Is(err, domain.ErrOAuthStateInvalid),
+		errors.Is(err, domain.ErrDeletionPending),
+		errors.Is(err, domain.ErrDeletionNotPending):
+		JSONError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, domain.ErrSessionNotFound):
+		JSONError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, domain.ErrForbidden):
 		JSONError(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, domain.ErrInvalidInput),
@@ -90,6 +108,12 @@ func codeToHTTPStatus(code domain.ErrorCode) int {
 	default:
 		return http.StatusInternalServerError
 	}
+}
+
+// writeJSON encodes a raw value (no APIResponse envelope) to the writer.
+// Used for file-attachment responses like the GDPR data export.
+func writeJSON(w http.ResponseWriter, v any) error {
+	return json.NewEncoder(w).Encode(v)
 }
 
 func DecodeJSON(r *http.Request, dst any) error {

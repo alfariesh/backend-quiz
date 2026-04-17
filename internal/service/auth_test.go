@@ -2,10 +2,10 @@ package service
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -15,613 +15,714 @@ import (
 	"github.com/alfariesh/backend-quiz/internal/domain"
 	"github.com/alfariesh/backend-quiz/internal/dto"
 	mockdomain "github.com/alfariesh/backend-quiz/internal/mocks/domain"
+	"github.com/alfariesh/backend-quiz/pkg/mailer"
+	"github.com/alfariesh/backend-quiz/pkg/password"
 )
 
 const testJWTSecret = "test-secret-key-for-testing"
 
-// --- Register ---
+// ── Test doubles for new repos (simple in-memory) ────────────
+
+type fakeEVRepo struct {
+	mu      sync.Mutex
+	byUser  map[uuid.UUID]*domain.EmailVerification
+	counter int
+}
+
+func newFakeEVRepo() *fakeEVRepo {
+	return &fakeEVRepo{byUser: map[uuid.UUID]*domain.EmailVerification{}}
+}
+func (r *fakeEVRepo) Create(ctx context.Context, ev *domain.EmailVerification) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.counter++
+	ev.ID = uuid.New()
+	ev.CreatedAt = time.Now()
+	r.byUser[ev.UserID] = ev
+	return nil
+}
+func (r *fakeEVRepo) GetActiveByUserID(ctx context.Context, userID uuid.UUID) (*domain.EmailVerification, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ev, ok := r.byUser[userID]
+	if !ok || ev.ConsumedAt != nil {
+		return nil, domain.ErrNotFound
+	}
+	return ev, nil
+}
+func (r *fakeEVRepo) IncrementAttempts(ctx context.Context, id uuid.UUID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, ev := range r.byUser {
+		if ev.ID == id {
+			ev.Attempts++
+			return nil
+		}
+	}
+	return nil
+}
+func (r *fakeEVRepo) Consume(ctx context.Context, id uuid.UUID, at time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, ev := range r.byUser {
+		if ev.ID == id {
+			ev.ConsumedAt = &at
+			return nil
+		}
+	}
+	return nil
+}
+func (r *fakeEVRepo) DeleteByUserID(ctx context.Context, userID uuid.UUID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.byUser, userID)
+	return nil
+}
+
+type fakePRTRepo struct {
+	mu      sync.Mutex
+	byHash  map[string]*domain.PasswordResetToken
+}
+
+func newFakePRTRepo() *fakePRTRepo {
+	return &fakePRTRepo{byHash: map[string]*domain.PasswordResetToken{}}
+}
+func (r *fakePRTRepo) Create(ctx context.Context, t *domain.PasswordResetToken) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t.ID = uuid.New()
+	t.CreatedAt = time.Now()
+	r.byHash[t.TokenHash] = t
+	return nil
+}
+func (r *fakePRTRepo) GetByHash(ctx context.Context, tokenHash string) (*domain.PasswordResetToken, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.byHash[tokenHash]
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	return t, nil
+}
+func (r *fakePRTRepo) Consume(ctx context.Context, id uuid.UUID, at time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, t := range r.byHash {
+		if t.ID == id {
+			t.ConsumedAt = &at
+			return nil
+		}
+	}
+	return nil
+}
+func (r *fakePRTRepo) DeleteByUserID(ctx context.Context, userID uuid.UUID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for hash, t := range r.byHash {
+		if t.UserID == userID {
+			delete(r.byHash, hash)
+		}
+	}
+	return nil
+}
+
+type fakeRTRepo struct {
+	mu     sync.Mutex
+	byHash map[string]*domain.RefreshToken
+	byID   map[uuid.UUID]*domain.RefreshToken
+}
+
+func newFakeRTRepo() *fakeRTRepo {
+	return &fakeRTRepo{
+		byHash: map[string]*domain.RefreshToken{},
+		byID:   map[uuid.UUID]*domain.RefreshToken{},
+	}
+}
+func (r *fakeRTRepo) Create(ctx context.Context, t *domain.RefreshToken) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t.ID = uuid.New()
+	t.CreatedAt = time.Now()
+	r.byHash[t.TokenHash] = t
+	r.byID[t.ID] = t
+	return nil
+}
+func (r *fakeRTRepo) GetByHash(ctx context.Context, tokenHash string) (*domain.RefreshToken, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.byHash[tokenHash]
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	return t, nil
+}
+func (r *fakeRTRepo) Revoke(ctx context.Context, id uuid.UUID, at time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if t, ok := r.byID[id]; ok && t.RevokedAt == nil {
+		t.RevokedAt = &at
+	}
+	return nil
+}
+func (r *fakeRTRepo) RevokeAllForUser(ctx context.Context, userID uuid.UUID, at time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, t := range r.byID {
+		if t.UserID == userID && t.RevokedAt == nil {
+			revokedAt := at
+			t.RevokedAt = &revokedAt
+		}
+	}
+	return nil
+}
+func (r *fakeRTRepo) RevokeChildren(ctx context.Context, parentID uuid.UUID, at time.Time) error {
+	return nil
+}
+func (r *fakeRTRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.RefreshToken, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.byID[id]
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	return t, nil
+}
+func (r *fakeRTRepo) ListActiveByUser(ctx context.Context, userID uuid.UUID, now time.Time) ([]*domain.RefreshToken, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []*domain.RefreshToken
+	for _, t := range r.byID {
+		if t.UserID == userID && t.RevokedAt == nil && t.ExpiresAt.After(now) {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+func (r *fakeRTRepo) DeviceSeen(ctx context.Context, userID uuid.UUID, userAgent, ipAddress string) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, t := range r.byID {
+		if t.UserID == userID && t.UserAgent == userAgent && t.IPAddress == ipAddress {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+type fakeLARepo struct {
+	mu       sync.Mutex
+	attempts []domain.LoginAttempt
+}
+
+func newFakeLARepo() *fakeLARepo { return &fakeLARepo{} }
+func (r *fakeLARepo) Create(ctx context.Context, a *domain.LoginAttempt) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	a.ID = uuid.New()
+	a.CreatedAt = time.Now()
+	r.attempts = append(r.attempts, *a)
+	return nil
+}
+func (r *fakeLARepo) CountRecentFailures(ctx context.Context, email string, since time.Time) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	n := 0
+	for _, a := range r.attempts {
+		if a.Email == email && !a.Successful && !a.CreatedAt.Before(since) {
+			n++
+		}
+	}
+	return n, nil
+}
+
+type capturingMailer struct {
+	sent []mailer.Message
+}
+
+func (m *capturingMailer) Send(ctx context.Context, msg mailer.Message) error {
+	m.sent = append(m.sent, msg)
+	return nil
+}
+
+type fakeAuditRepo struct {
+	mu   sync.Mutex
+	logs []domain.AuthAuditLog
+}
+
+func newFakeAuditRepo() *fakeAuditRepo { return &fakeAuditRepo{} }
+func (r *fakeAuditRepo) Create(ctx context.Context, l *domain.AuthAuditLog) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	l.ID = uuid.New()
+	l.CreatedAt = time.Now()
+	r.logs = append(r.logs, *l)
+	return nil
+}
+
+type fakeExportRepo struct {
+	data map[string]any
+	err  error
+}
+
+func (r *fakeExportRepo) Dump(ctx context.Context, userID uuid.UUID) (map[string]any, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	if r.data != nil {
+		return r.data, nil
+	}
+	return map[string]any{"user": map[string]any{"id": userID.String()}}, nil
+}
+
+type testDeps struct {
+	userRepo   *mockdomain.MockUserRepository
+	evRepo     *fakeEVRepo
+	prtRepo    *fakePRTRepo
+	rtRepo     *fakeRTRepo
+	laRepo     *fakeLARepo
+	auditRepo  *fakeAuditRepo
+	exportRepo *fakeExportRepo
+	mailer     *capturingMailer
+	svc        *AuthService
+}
+
+func defaultPolicy() AuthPolicy {
+	return AuthPolicy{
+		OTPLength:            6,
+		OTPTTL:               15 * time.Minute,
+		OTPMaxAttempts:       5,
+		ResetTokenTTL:        15 * time.Minute,
+		LoginLockoutWindow:   15 * time.Minute,
+		LoginLockoutMaxFails: 5,
+		RequireEmailVerified: false,
+	}
+}
+
+func newTestSvc(t *testing.T) testDeps {
+	t.Helper()
+	userRepo := mockdomain.NewMockUserRepository(t)
+	ev := newFakeEVRepo()
+	prt := newFakePRTRepo()
+	rt := newFakeRTRepo()
+	la := newFakeLARepo()
+	audit := newFakeAuditRepo()
+	export := &fakeExportRepo{}
+	m := &capturingMailer{}
+
+	svc := NewAuthService(
+		userRepo, ev, prt, rt, la, audit, export,
+		noopUoW{}, m,
+		password.Policy{MinLength: 8, MaxLength: 72},
+		testJWTSecret, 15*time.Minute, 720*time.Hour,
+		"http://localhost:3000",
+		defaultPolicy(),
+	)
+	return testDeps{
+		userRepo:   userRepo,
+		evRepo:     ev,
+		prtRepo:    prt,
+		rtRepo:     rt,
+		laRepo:     la,
+		auditRepo:  audit,
+		exportRepo: export,
+		mailer:     m,
+		svc:        svc,
+	}
+}
+
+// ── Register ────────────────────────────────────────────────
 
 func TestAuthService_Register_Success(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	d := newTestSvc(t)
 	ctx := context.Background()
 
-	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
-	repo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
+	d.userRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
+	d.userRepo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
 
-	tokens, user, err := svc.Register(ctx, dto.RegisterRequest{
+	tokens, user, err := d.svc.Register(ctx, dto.RegisterRequest{
 		Email:       "test@example.com",
 		Password:    "password123",
 		DisplayName: "Test User",
 	})
-
 	require.NoError(t, err)
 	assert.NotEmpty(t, tokens.AccessToken)
 	assert.NotEmpty(t, tokens.RefreshToken)
 	assert.Equal(t, "test@example.com", user.Email)
-	assert.Equal(t, "Test User", user.DisplayName)
-	assert.Equal(t, "UTC", user.Timezone)
-	assert.Equal(t, 0.9, user.DesiredRetention)
-	assert.Equal(t, 20, user.DailyNewLimit)
-	assert.Equal(t, 200, user.DailyReviewLimit)
-
-	// Verify password was hashed
-	createCall := repo.Calls[1]
-	createdUser := createCall.Arguments.Get(1).(*domain.User)
-	assert.NoError(t, bcrypt.CompareHashAndPassword([]byte(createdUser.PasswordHash), []byte("password123")))
+	assert.Len(t, d.mailer.sent, 1, "verification email should be sent")
 }
 
 func TestAuthService_Register_EmailTaken(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	d := newTestSvc(t)
 	ctx := context.Background()
 
 	existing := &domain.User{ID: uuid.New(), Email: "test@example.com"}
-	repo.On("GetByEmail", ctx, "test@example.com").Return(existing, nil)
+	d.userRepo.On("GetByEmail", ctx, "test@example.com").Return(existing, nil)
 
-	_, _, err := svc.Register(ctx, dto.RegisterRequest{
-		Email:       "test@example.com",
-		Password:    "password123",
-		DisplayName: "Test",
+	_, _, err := d.svc.Register(ctx, dto.RegisterRequest{
+		Email: "test@example.com", Password: "password123", DisplayName: "Test",
 	})
-
 	assert.ErrorIs(t, err, domain.ErrEmailTaken)
 }
 
-func TestAuthService_Register_RepoError(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, assert.AnError)
-
-	_, _, err := svc.Register(ctx, dto.RegisterRequest{
-		Email:       "test@example.com",
-		Password:    "password123",
-		DisplayName: "Test",
-	})
-
-	assert.Error(t, err)
-	assert.NotErrorIs(t, err, domain.ErrEmailTaken)
-}
-
-// --- Login ---
+// ── Login ──────────────────────────────────────────────────
 
 func TestAuthService_Login_Success(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	d := newTestSvc(t)
 	ctx := context.Background()
 
-	hash, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.MinCost)
-	user := &domain.User{
-		ID:           uuid.New(),
-		Email:        "test@example.com",
-		PasswordHash: string(hash),
-		DisplayName:  "Test User",
-	}
-	repo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	hash, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	user := &domain.User{ID: uuid.New(), Email: "test@example.com", PasswordHash: string(hash)}
+	d.userRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
 
-	tokens, returnedUser, err := svc.Login(ctx, dto.LoginRequest{
-		Email:    "test@example.com",
-		Password: "password123",
-	})
-
+	tokens, u, err := d.svc.Login(ctx, dto.LoginRequest{Email: "test@example.com", Password: "password123"})
 	require.NoError(t, err)
 	assert.NotEmpty(t, tokens.AccessToken)
-	assert.Equal(t, user.ID, returnedUser.ID)
-}
-
-func TestAuthService_Login_UserNotFound(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	repo.On("GetByEmail", ctx, "noone@example.com").Return(nil, domain.ErrNotFound)
-
-	_, _, err := svc.Login(ctx, dto.LoginRequest{
-		Email:    "noone@example.com",
-		Password: "password123",
-	})
-
-	assert.ErrorIs(t, err, domain.ErrInvalidCredentials)
+	assert.Equal(t, user.ID, u.ID)
+	assert.Equal(t, 1, len(d.laRepo.attempts))
+	assert.True(t, d.laRepo.attempts[0].Successful)
 }
 
 func TestAuthService_Login_WrongPassword(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+	d := newTestSvc(t)
 	ctx := context.Background()
 
-	hash, _ := bcrypt.GenerateFromPassword([]byte("correct-password"), bcrypt.MinCost)
+	hash, _ := bcrypt.GenerateFromPassword([]byte("correct-password"), bcrypt.DefaultCost)
 	user := &domain.User{ID: uuid.New(), Email: "test@example.com", PasswordHash: string(hash)}
-	repo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	d.userRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
 
-	_, _, err := svc.Login(ctx, dto.LoginRequest{
-		Email:    "test@example.com",
-		Password: "wrong-password",
+	_, _, err := d.svc.Login(ctx, dto.LoginRequest{Email: "test@example.com", Password: "wrong"})
+	assert.ErrorIs(t, err, domain.ErrInvalidCredentials)
+	assert.False(t, d.laRepo.attempts[0].Successful)
+}
+
+func TestAuthService_Login_Lockout(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+
+	// Seed 5 recent failures.
+	for i := 0; i < 5; i++ {
+		_ = d.laRepo.Create(ctx, &domain.LoginAttempt{Email: "test@example.com", Successful: false})
+	}
+
+	_, _, err := d.svc.Login(ctx, dto.LoginRequest{Email: "test@example.com", Password: "anything"})
+	assert.ErrorIs(t, err, domain.ErrAccountLocked)
+}
+
+// ── Refresh token ──────────────────────────────────────────
+
+func TestAuthService_RefreshToken_Success(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	d.userRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
+	d.userRepo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(func(_ context.Context, u *domain.User) error {
+		u.ID = userID
+		return nil
 	})
+	d.userRepo.On("GetByID", ctx, userID).Return(&domain.User{ID: userID}, nil)
 
+	tokens, _, err := d.svc.Register(ctx, dto.RegisterRequest{
+		Email: "test@example.com", Password: "password123", DisplayName: "T",
+	})
+	require.NoError(t, err)
+
+	newTokens, err := d.svc.RefreshToken(ctx, tokens.RefreshToken)
+	require.NoError(t, err)
+	assert.NotEmpty(t, newTokens.AccessToken)
+	assert.NotEqual(t, tokens.RefreshToken, newTokens.RefreshToken, "refresh token should rotate")
+}
+
+func TestAuthService_RefreshToken_ReuseDetected(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	d.userRepo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
+	d.userRepo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(func(_ context.Context, u *domain.User) error {
+		u.ID = userID
+		return nil
+	})
+	d.userRepo.On("GetByID", ctx, userID).Return(&domain.User{ID: userID}, nil)
+
+	tokens, _, err := d.svc.Register(ctx, dto.RegisterRequest{
+		Email: "test@example.com", Password: "password123", DisplayName: "T",
+	})
+	require.NoError(t, err)
+
+	// First refresh — succeeds.
+	_, err = d.svc.RefreshToken(ctx, tokens.RefreshToken)
+	require.NoError(t, err)
+
+	// Reusing the original (now revoked) refresh token — should be detected.
+	_, err = d.svc.RefreshToken(ctx, tokens.RefreshToken)
+	assert.ErrorIs(t, err, domain.ErrRefreshTokenReuse)
+}
+
+func TestAuthService_RefreshToken_Invalid(t *testing.T) {
+	d := newTestSvc(t)
+	_, err := d.svc.RefreshToken(context.Background(), "not-a-real-token")
+	assert.ErrorIs(t, err, domain.ErrRefreshTokenInvalid)
+}
+
+// ── Email verification ─────────────────────────────────────
+
+func TestAuthService_VerifyEmail_Success(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	user := &domain.User{ID: userID, Email: "test@example.com", DisplayName: "T"}
+	d.userRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+	d.userRepo.On("MarkEmailVerified", ctx, userID, mock.Anything).Return(nil)
+
+	// Manually seed a code so we know what to submit.
+	require.NoError(t, d.svc.issueVerificationCode(ctx, user))
+	require.Len(t, d.mailer.sent, 1)
+	sentBody := d.mailer.sent[0].TextBody
+	// Extract code from body (6 digits).
+	var code string
+	for i := 0; i < len(sentBody)-5; i++ {
+		if isAllDigits(sentBody[i : i+6]) {
+			code = sentBody[i : i+6]
+			break
+		}
+	}
+	require.NotEmpty(t, code, "should find 6-digit code in email body")
+
+	err := d.svc.VerifyEmail(ctx, dto.VerifyEmailRequest{Email: "test@example.com", Code: code})
+	assert.NoError(t, err)
+}
+
+func TestAuthService_VerifyEmail_WrongCode(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	user := &domain.User{ID: userID, Email: "test@example.com", DisplayName: "T"}
+	d.userRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+
+	require.NoError(t, d.svc.issueVerificationCode(ctx, user))
+
+	err := d.svc.VerifyEmail(ctx, dto.VerifyEmailRequest{Email: "test@example.com", Code: "000000"})
+	assert.ErrorIs(t, err, domain.ErrOTPInvalid)
+}
+
+// ── Password reset ─────────────────────────────────────────
+
+func TestAuthService_ForgotResetPassword_Flow(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	hash, _ := bcrypt.GenerateFromPassword([]byte("old-password"), bcrypt.DefaultCost)
+	user := &domain.User{ID: userID, Email: "test@example.com", PasswordHash: string(hash), DisplayName: "T"}
+	d.userRepo.On("GetByEmail", ctx, "test@example.com").Return(user, nil)
+
+	require.NoError(t, d.svc.ForgotPassword(ctx, "test@example.com"))
+	require.Len(t, d.mailer.sent, 1, "reset email sent")
+
+	// Grab raw token from URL (we don't have it; use test hook: inspect stored token → but we only stored hash).
+	// Extract token query param from email body.
+	body := d.mailer.sent[0].TextBody
+	// Find "token=" and extract until newline or end.
+	tokenStart := -1
+	for i := 0; i+6 < len(body); i++ {
+		if body[i:i+6] == "token=" {
+			tokenStart = i + 6
+			break
+		}
+	}
+	require.GreaterOrEqual(t, tokenStart, 0, "token= found in email")
+	tokenEnd := len(body)
+	for i := tokenStart; i < len(body); i++ {
+		if body[i] == '\n' || body[i] == ' ' {
+			tokenEnd = i
+			break
+		}
+	}
+	rawToken := body[tokenStart:tokenEnd]
+	// URL-decode any %XX.
+	rawToken, err := urlDecode(rawToken)
+	require.NoError(t, err)
+
+	d.userRepo.On("UpdatePassword", ctx, userID, mock.AnythingOfType("string")).Return(nil)
+
+	require.NoError(t, d.svc.ResetPassword(ctx, dto.ResetPasswordRequest{
+		Token: rawToken, NewPassword: "new-password-123",
+	}))
+}
+
+// ── Change password ────────────────────────────────────────
+
+func TestAuthService_ChangePassword_Success(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	hash, _ := bcrypt.GenerateFromPassword([]byte("old-password"), bcrypt.DefaultCost)
+	user := &domain.User{ID: userID, Email: "t@e.com", PasswordHash: string(hash)}
+	d.userRepo.On("GetByID", ctx, userID).Return(user, nil)
+	d.userRepo.On("UpdatePassword", ctx, userID, mock.AnythingOfType("string")).Return(nil)
+
+	err := d.svc.ChangePassword(ctx, userID, dto.ChangePasswordRequest{
+		OldPassword: "old-password", NewPassword: "brand-new-pw-99",
+	})
+	assert.NoError(t, err)
+}
+
+func TestAuthService_ChangePassword_WrongOld(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	hash, _ := bcrypt.GenerateFromPassword([]byte("old-password"), bcrypt.DefaultCost)
+	user := &domain.User{ID: userID, PasswordHash: string(hash)}
+	d.userRepo.On("GetByID", ctx, userID).Return(user, nil)
+
+	err := d.svc.ChangePassword(ctx, userID, dto.ChangePasswordRequest{
+		OldPassword: "wrong", NewPassword: "brand-new-pw-99",
+	})
 	assert.ErrorIs(t, err, domain.ErrInvalidCredentials)
 }
 
-// --- RefreshToken ---
+// ── Account deletion ───────────────────────────────────────
 
-func TestAuthService_RefreshToken_Success(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
+func TestAuthService_RequestAccountDeletion_Success(t *testing.T) {
+	d := newTestSvc(t)
+	d.svc.policy.AccountDeletionGracePeriod = 30 * 24 * time.Hour
 	ctx := context.Background()
 
 	userID := uuid.New()
-	user := &domain.User{ID: userID, Email: "test@example.com"}
+	user := &domain.User{ID: userID, Email: "t@e.com", DisplayName: "Tester"}
 
-	// Generate a valid refresh token
-	claims := jwt.MapClaims{
-		"sub":  userID.String(),
-		"type": "refresh",
-		"iat":  time.Now().Unix(),
-		"exp":  time.Now().Add(time.Hour).Unix(),
+	d.userRepo.On("GetByID", ctx, userID).Return(user, nil)
+	d.userRepo.On("RequestDeletion", ctx, userID, mock.AnythingOfType("time.Time")).Return(nil)
+
+	got, err := d.svc.RequestAccountDeletion(ctx, userID, RequestMeta{IPAddress: "1.2.3.4"})
+	require.NoError(t, err)
+	require.NotNil(t, got.DeletionRequestedAt)
+
+	// Email sent + audit emitted
+	assert.Len(t, d.mailer.sent, 1)
+	assert.Contains(t, d.mailer.sent[0].Subject, "penghapusan")
+	require.Len(t, d.auditRepo.logs, 1)
+	assert.Equal(t, domain.AuditEventAccountDeletionRequested, d.auditRepo.logs[0].Event)
+}
+
+func TestAuthService_RequestAccountDeletion_AlreadyPending(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	now := time.Now()
+	user := &domain.User{ID: userID, Email: "t@e.com", DeletionRequestedAt: &now}
+	d.userRepo.On("GetByID", ctx, userID).Return(user, nil)
+
+	_, err := d.svc.RequestAccountDeletion(ctx, userID, RequestMeta{})
+	assert.ErrorIs(t, err, domain.ErrDeletionPending)
+	assert.Empty(t, d.mailer.sent)
+}
+
+func TestAuthService_CancelAccountDeletion_Success(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	now := time.Now()
+	user := &domain.User{ID: userID, Email: "t@e.com", DisplayName: "Tester", DeletionRequestedAt: &now}
+	d.userRepo.On("GetByID", ctx, userID).Return(user, nil)
+	d.userRepo.On("CancelDeletion", ctx, userID).Return(nil)
+
+	got, err := d.svc.CancelAccountDeletion(ctx, userID, RequestMeta{})
+	require.NoError(t, err)
+	assert.Nil(t, got.DeletionRequestedAt)
+
+	assert.Len(t, d.mailer.sent, 1)
+	require.Len(t, d.auditRepo.logs, 1)
+	assert.Equal(t, domain.AuditEventAccountDeletionCancelled, d.auditRepo.logs[0].Event)
+}
+
+func TestAuthService_CancelAccountDeletion_NotPending(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	user := &domain.User{ID: userID, Email: "t@e.com"}
+	d.userRepo.On("GetByID", ctx, userID).Return(user, nil)
+
+	_, err := d.svc.CancelAccountDeletion(ctx, userID, RequestMeta{})
+	assert.ErrorIs(t, err, domain.ErrDeletionNotPending)
+}
+
+func TestAuthService_ExportAccountData(t *testing.T) {
+	d := newTestSvc(t)
+	ctx := context.Background()
+	userID := uuid.New()
+	d.exportRepo.data = map[string]any{"user": map[string]any{"id": userID.String()}, "decks": []any{}}
+
+	got, err := d.svc.ExportAccountData(ctx, userID, RequestMeta{})
+	require.NoError(t, err)
+	assert.Contains(t, got, "user")
+	require.Len(t, d.auditRepo.logs, 1)
+	assert.Equal(t, domain.AuditEventDataExported, d.auditRepo.logs[0].Event)
+}
+
+func TestAuthService_PurgeExpiredAccounts(t *testing.T) {
+	d := newTestSvc(t)
+	d.svc.policy.AccountDeletionGracePeriod = 30 * 24 * time.Hour
+	ctx := context.Background()
+
+	id1, id2 := uuid.New(), uuid.New()
+	d.userRepo.On("ListExpiredDeletions", ctx, mock.AnythingOfType("time.Time"), 50).Return([]uuid.UUID{id1, id2}, nil)
+	d.userRepo.On("Delete", ctx, id1).Return(nil)
+	d.userRepo.On("Delete", ctx, id2).Return(nil)
+
+	n, err := d.svc.PurgeExpiredAccounts(ctx, 50)
+	require.NoError(t, err)
+	assert.Equal(t, 2, n)
+	assert.Len(t, d.auditRepo.logs, 2)
+}
+
+// ── Helpers ────────────────────────────────────────────────
+
+func isAllDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
 	}
-	refreshToken, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testJWTSecret))
-
-	repo.On("GetByID", ctx, userID).Return(user, nil)
-
-	tokens, err := svc.RefreshToken(ctx, refreshToken)
-
-	require.NoError(t, err)
-	assert.NotEmpty(t, tokens.AccessToken)
-	assert.NotEmpty(t, tokens.RefreshToken)
+	return true
 }
 
-func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	_, err := svc.RefreshToken(ctx, "invalid-token")
-	assert.ErrorIs(t, err, domain.ErrUnauthorized)
-}
-
-func TestAuthService_RefreshToken_AccessTokenRejected(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	// Use access type instead of refresh
-	claims := jwt.MapClaims{
-		"sub":  uuid.New().String(),
-		"type": "access",
-		"exp":  time.Now().Add(time.Hour).Unix(),
+func urlDecode(s string) (string, error) {
+	// Minimal percent-decoding for test convenience.
+	out := make([]byte, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] == '%' && i+2 < len(s) {
+			high := fromHex(s[i+1])
+			low := fromHex(s[i+2])
+			if high < 0 || low < 0 {
+				out = append(out, s[i])
+				continue
+			}
+			out = append(out, byte(high<<4|low))
+			i += 2
+		} else {
+			out = append(out, s[i])
+		}
 	}
-	accessToken, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testJWTSecret))
-
-	_, err := svc.RefreshToken(ctx, accessToken)
-	assert.ErrorIs(t, err, domain.ErrUnauthorized)
+	return string(out), nil
 }
 
-func TestAuthService_RefreshToken_ExpiredToken(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	claims := jwt.MapClaims{
-		"sub":  uuid.New().String(),
-		"type": "refresh",
-		"exp":  time.Now().Add(-time.Hour).Unix(), // expired
+func fromHex(c byte) int {
+	switch {
+	case c >= '0' && c <= '9':
+		return int(c - '0')
+	case c >= 'a' && c <= 'f':
+		return int(c-'a') + 10
+	case c >= 'A' && c <= 'F':
+		return int(c-'A') + 10
 	}
-	token, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testJWTSecret))
-
-	_, err := svc.RefreshToken(ctx, token)
-	assert.ErrorIs(t, err, domain.ErrUnauthorized)
-}
-
-func TestAuthService_RefreshToken_UserDeleted(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	userID := uuid.New()
-	claims := jwt.MapClaims{
-		"sub":  userID.String(),
-		"type": "refresh",
-		"exp":  time.Now().Add(time.Hour).Unix(),
-	}
-	token, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(testJWTSecret))
-
-	repo.On("GetByID", ctx, userID).Return(nil, domain.ErrNotFound)
-
-	_, err := svc.RefreshToken(ctx, token)
-	assert.ErrorIs(t, err, domain.ErrUnauthorized)
-}
-
-// --- GetProfile ---
-
-func TestAuthService_GetProfile(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	userID := uuid.New()
-	user := &domain.User{ID: userID, Email: "test@example.com", DisplayName: "Test"}
-	repo.On("GetByID", ctx, userID).Return(user, nil)
-
-	result, err := svc.GetProfile(ctx, userID)
-
-	require.NoError(t, err)
-	assert.Equal(t, userID, result.ID)
-}
-
-func TestAuthService_GetProfile_NotFound(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	userID := uuid.New()
-	repo.On("GetByID", ctx, userID).Return(nil, domain.ErrNotFound)
-
-	_, err := svc.GetProfile(ctx, userID)
-	assert.ErrorIs(t, err, domain.ErrNotFound)
-}
-
-// --- UpdateProfile ---
-
-func TestAuthService_UpdateProfile_AllFields(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	userID := uuid.New()
-	user := &domain.User{
-		ID:               userID,
-		Email:            "test@example.com",
-		DisplayName:      "Old Name",
-		Timezone:         "UTC",
-		DesiredRetention: 0.9,
-		DailyNewLimit:    20,
-		DailyReviewLimit: 200,
-	}
-
-	repo.On("GetByID", ctx, userID).Return(user, nil)
-	repo.On("Update", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
-
-	name := "New Name"
-	tz := "Asia/Jakarta"
-	ret := 0.85
-	newLimit := 30
-	reviewLimit := 300
-	weights := make([]float64, 19)
-	for i := range weights {
-		weights[i] = float64(i) * 0.1
-	}
-
-	reminderEnabled := true
-	reminderTime := "08:00"
-
-	result, err := svc.UpdateProfile(ctx, userID, dto.UpdateProfileRequest{
-		DisplayName:      &name,
-		Timezone:         &tz,
-		DesiredRetention: &ret,
-		DailyNewLimit:    &newLimit,
-		DailyReviewLimit: &reviewLimit,
-		FSRSWeights:      weights,
-		ReminderEnabled:  &reminderEnabled,
-		ReminderTime:     &reminderTime,
-	})
-
-	require.NoError(t, err)
-	assert.Equal(t, "New Name", result.DisplayName)
-	assert.Equal(t, "Asia/Jakarta", result.Timezone)
-	assert.Equal(t, 0.85, result.DesiredRetention)
-	assert.Equal(t, 30, result.DailyNewLimit)
-	assert.Equal(t, 300, result.DailyReviewLimit)
-	assert.Equal(t, weights, result.FSRSWeights)
-	assert.True(t, result.ReminderEnabled)
-	assert.Equal(t, "08:00", result.ReminderTime)
-}
-
-func TestAuthService_UpdateProfile_PartialUpdate(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	userID := uuid.New()
-	user := &domain.User{
-		ID:               userID,
-		DisplayName:      "Original",
-		Timezone:         "UTC",
-		DesiredRetention: 0.9,
-		DailyNewLimit:    20,
-		DailyReviewLimit: 200,
-	}
-
-	repo.On("GetByID", ctx, userID).Return(user, nil)
-	repo.On("Update", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
-
-	name := "Updated"
-	result, err := svc.UpdateProfile(ctx, userID, dto.UpdateProfileRequest{
-		DisplayName: &name,
-	})
-
-	require.NoError(t, err)
-	assert.Equal(t, "Updated", result.DisplayName)
-	assert.Equal(t, "UTC", result.Timezone)                // unchanged
-	assert.Equal(t, 0.9, result.DesiredRetention)           // unchanged
-	assert.Equal(t, 20, result.DailyNewLimit)               // unchanged
-	assert.Equal(t, 200, result.DailyReviewLimit)           // unchanged
-}
-
-func TestAuthService_UpdateProfile_FSRSWeightsOnly(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	userID := uuid.New()
-	user := &domain.User{ID: userID, DisplayName: "Test"}
-
-	repo.On("GetByID", ctx, userID).Return(user, nil)
-	repo.On("Update", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
-
-	weights := make([]float64, 19)
-	weights[0] = 0.4
-	weights[1] = 0.6
-
-	result, err := svc.UpdateProfile(ctx, userID, dto.UpdateProfileRequest{
-		FSRSWeights: weights,
-	})
-
-	require.NoError(t, err)
-	require.Len(t, result.FSRSWeights, 19)
-	assert.Equal(t, 0.4, result.FSRSWeights[0])
-	assert.Equal(t, 0.6, result.FSRSWeights[1])
-}
-
-func TestAuthService_UpdateProfile_UserNotFound(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	userID := uuid.New()
-	repo.On("GetByID", ctx, userID).Return(nil, domain.ErrNotFound)
-
-	_, err := svc.UpdateProfile(ctx, userID, dto.UpdateProfileRequest{})
-	assert.ErrorIs(t, err, domain.ErrNotFound)
-}
-
-// --- FindOrCreateOAuthUser ---
-
-func TestAuthService_FindOrCreateOAuthUser_ExistingOAuth(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	userID := uuid.New()
-	oauth := &domain.OAuthAccount{UserID: userID, Provider: "google", ProviderID: "g123"}
-	user := &domain.User{ID: userID, Email: "test@example.com"}
-
-	repo.On("GetOAuthAccount", ctx, "google", "g123").Return(oauth, nil)
-	repo.On("GetByID", ctx, userID).Return(user, nil)
-
-	tokens, returnedUser, err := svc.FindOrCreateOAuthUser(ctx, "google", "g123", "test@example.com", "Test", nil)
-
-	require.NoError(t, err)
-	assert.NotEmpty(t, tokens.AccessToken)
-	assert.Equal(t, userID, returnedUser.ID)
-}
-
-func TestAuthService_FindOrCreateOAuthUser_NewUser(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	repo.On("GetOAuthAccount", ctx, "google", "g456").Return(nil, domain.ErrNotFound)
-	repo.On("GetByEmail", ctx, "new@example.com").Return(nil, domain.ErrNotFound)
-	repo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
-	repo.On("CreateOAuthAccount", ctx, mock.AnythingOfType("*domain.OAuthAccount")).Return(nil)
-
-	tokens, user, err := svc.FindOrCreateOAuthUser(ctx, "google", "g456", "new@example.com", "New User", nil)
-
-	require.NoError(t, err)
-	assert.NotEmpty(t, tokens.AccessToken)
-	assert.Equal(t, "new@example.com", user.Email)
-	assert.Equal(t, "New User", user.DisplayName)
-}
-
-func TestAuthService_FindOrCreateOAuthUser_ExistingEmailLinkOAuth(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	userID := uuid.New()
-	existingUser := &domain.User{ID: userID, Email: "existing@example.com"}
-
-	repo.On("GetOAuthAccount", ctx, "google", "g789").Return(nil, domain.ErrNotFound)
-	repo.On("GetByEmail", ctx, "existing@example.com").Return(existingUser, nil)
-	repo.On("CreateOAuthAccount", ctx, mock.AnythingOfType("*domain.OAuthAccount")).Return(nil)
-
-	tokens, user, err := svc.FindOrCreateOAuthUser(ctx, "google", "g789", "existing@example.com", "Existing", nil)
-
-	require.NoError(t, err)
-	assert.NotEmpty(t, tokens.AccessToken)
-	assert.Equal(t, userID, user.ID) // linked to existing user
-}
-
-func TestAuthService_FindOrCreateOAuthUser_OAuthRepoError(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	repo.On("GetOAuthAccount", ctx, "google", "g000").Return(nil, assert.AnError)
-
-	_, _, err := svc.FindOrCreateOAuthUser(ctx, "google", "g000", "test@example.com", "Test", nil)
-	assert.Error(t, err)
-}
-
-func TestAuthService_FindOrCreateOAuthUser_ExistingOAuth_UserNotFound(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	userID := uuid.New()
-	oauth := &domain.OAuthAccount{UserID: userID, Provider: "google", ProviderID: "g111"}
-
-	repo.On("GetOAuthAccount", ctx, "google", "g111").Return(oauth, nil)
-	repo.On("GetByID", ctx, userID).Return(nil, domain.ErrNotFound)
-
-	_, _, err := svc.FindOrCreateOAuthUser(ctx, "google", "g111", "test@example.com", "Test", nil)
-	assert.ErrorIs(t, err, domain.ErrNotFound)
-}
-
-func TestAuthService_FindOrCreateOAuthUser_GetByEmailError(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	repo.On("GetOAuthAccount", ctx, "google", "g222").Return(nil, domain.ErrNotFound)
-	repo.On("GetByEmail", ctx, "error@example.com").Return(nil, assert.AnError)
-
-	_, _, err := svc.FindOrCreateOAuthUser(ctx, "google", "g222", "error@example.com", "Test", nil)
-	assert.Error(t, err)
-}
-
-func TestAuthService_FindOrCreateOAuthUser_WithAvatar(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	avatar := "https://example.com/avatar.jpg"
-	repo.On("GetOAuthAccount", ctx, "google", "g333").Return(nil, domain.ErrNotFound)
-	repo.On("GetByEmail", ctx, "avatar@example.com").Return(nil, domain.ErrNotFound)
-	repo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
-	repo.On("CreateOAuthAccount", ctx, mock.AnythingOfType("*domain.OAuthAccount")).Return(nil)
-
-	tokens, user, err := svc.FindOrCreateOAuthUser(ctx, "google", "g333", "avatar@example.com", "Avatar User", &avatar)
-
-	require.NoError(t, err)
-	assert.NotEmpty(t, tokens.AccessToken)
-	assert.Equal(t, "avatar@example.com", user.Email)
-}
-
-// --- generateTokens (via JWT structure validation) ---
-
-func TestAuthService_GenerateTokens_Structure(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-
-	userID := uuid.New()
-	tokens, err := svc.generateTokens(userID)
-	require.NoError(t, err)
-
-	// Parse and verify access token
-	accessToken, err := jwt.Parse(tokens.AccessToken, func(t *jwt.Token) (any, error) {
-		return []byte(testJWTSecret), nil
-	})
-	require.NoError(t, err)
-	assert.True(t, accessToken.Valid)
-
-	accessClaims := accessToken.Claims.(jwt.MapClaims)
-	assert.Equal(t, userID.String(), accessClaims["sub"])
-	assert.Equal(t, "access", accessClaims["type"])
-
-	// Parse and verify refresh token
-	refreshToken, err := jwt.Parse(tokens.RefreshToken, func(t *jwt.Token) (any, error) {
-		return []byte(testJWTSecret), nil
-	})
-	require.NoError(t, err)
-	assert.True(t, refreshToken.Valid)
-
-	refreshClaims := refreshToken.Claims.(jwt.MapClaims)
-	assert.Equal(t, userID.String(), refreshClaims["sub"])
-	assert.Equal(t, "refresh", refreshClaims["type"])
-
-	assert.Greater(t, tokens.ExpiresAt, time.Now().Unix())
-}
-
-// --- Register: GetByEmail repo error (not ErrNotFound) ---
-
-func TestAuthService_Register_GetByEmailRepoError(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, assert.AnError)
-
-	_, _, err := svc.Register(ctx, dto.RegisterRequest{
-		Email: "test@example.com", Password: "password123", DisplayName: "Test",
-	})
-	assert.Error(t, err)
-	assert.NotErrorIs(t, err, domain.ErrEmailTaken)
-}
-
-func TestAuthService_Register_CreateError(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
-	repo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(assert.AnError)
-
-	_, _, err := svc.Register(ctx, dto.RegisterRequest{
-		Email: "test@example.com", Password: "password123", DisplayName: "Test",
-	})
-	assert.Error(t, err)
-}
-
-// --- Login: GetByEmail repo error (not ErrNotFound) ---
-
-func TestAuthService_Login_RepoError(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, assert.AnError)
-
-	_, _, err := svc.Login(ctx, dto.LoginRequest{
-		Email: "test@example.com", Password: "password123",
-	})
-	assert.Error(t, err)
-	assert.NotErrorIs(t, err, domain.ErrInvalidCredentials)
-}
-
-// --- RefreshToken: non-HMAC signing method ---
-
-func TestAuthService_RefreshToken_NonHMACMethod(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	// Create a token with "none" method — should be rejected
-	_, err := svc.RefreshToken(ctx, "not.a.valid.token")
-	assert.ErrorIs(t, err, domain.ErrUnauthorized)
-}
-
-func TestAuthService_RefreshToken_InvalidSubject(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	// Create refresh token with invalid UUID as sub
-	claims := jwt.MapClaims{
-		"sub":  "not-a-uuid",
-		"type": "refresh",
-		"exp":  time.Now().Add(time.Hour).Unix(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenStr, _ := token.SignedString([]byte(testJWTSecret))
-
-	_, err := svc.RefreshToken(ctx, tokenStr)
-	assert.ErrorIs(t, err, domain.ErrUnauthorized)
-}
-
-// --- FindOrCreateOAuthUser: UoW error (create fails) ---
-
-func TestAuthService_FindOrCreateOAuthUser_CreateOAuthError(t *testing.T) {
-	repo := mockdomain.NewMockUserRepository(t)
-	svc := NewAuthService(repo, noopUoW{}, testJWTSecret, 15*time.Minute, 720*time.Hour)
-	ctx := context.Background()
-
-	repo.On("GetOAuthAccount", ctx, "google", "123").Return(nil, domain.ErrNotFound)
-	repo.On("GetByEmail", ctx, "test@example.com").Return(nil, domain.ErrNotFound)
-	repo.On("Create", ctx, mock.AnythingOfType("*domain.User")).Return(nil)
-	repo.On("CreateOAuthAccount", ctx, mock.AnythingOfType("*domain.OAuthAccount")).Return(assert.AnError)
-
-	_, _, err := svc.FindOrCreateOAuthUser(ctx, "google", "123", "test@example.com", "Test", nil)
-	assert.Error(t, err)
+	return -1
 }

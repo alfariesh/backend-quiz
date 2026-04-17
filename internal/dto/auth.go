@@ -8,13 +8,52 @@ type TokenPair struct {
 
 type RegisterRequest struct {
 	Email       string `json:"email" validate:"required,email"`
-	Password    string `json:"password" validate:"required,min=8"`
+	Password    string `json:"password" validate:"required,min=8,max=72"`
 	DisplayName string `json:"display_name" validate:"required,min=1,max=100"`
 }
 
 type LoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
+type VerifyEmailRequest struct {
+	Email string `json:"email" validate:"required,email"`
+	Code  string `json:"code" validate:"required,len=6,numeric"`
+}
+
+type ResendVerificationRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+type ResetPasswordRequest struct {
+	Token       string `json:"token" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=8,max=72"`
+}
+
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=8,max=72"`
+}
+
+type SessionDTO struct {
+	ID        string `json:"id"`
+	UserAgent string `json:"user_agent"`
+	IPAddress string `json:"ip_address"`
+	CreatedAt int64  `json:"created_at"`
+	ExpiresAt int64  `json:"expires_at"`
 }
 
 type UpdateProfileRequest struct {

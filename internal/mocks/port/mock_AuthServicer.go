@@ -26,6 +26,172 @@ func (_m *MockAuthServicer) EXPECT() *MockAuthServicer_Expecter {
 	return &MockAuthServicer_Expecter{mock: &_m.Mock}
 }
 
+// CancelAccountDeletionBasic provides a mock function with given fields: ctx, userID
+func (_m *MockAuthServicer) CancelAccountDeletionBasic(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CancelAccountDeletionBasic")
+	}
+
+	var r0 *domain.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) (*domain.User, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) *domain.User); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*domain.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAuthServicer_CancelAccountDeletionBasic_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CancelAccountDeletionBasic'
+type MockAuthServicer_CancelAccountDeletionBasic_Call struct {
+	*mock.Call
+}
+
+// CancelAccountDeletionBasic is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+func (_e *MockAuthServicer_Expecter) CancelAccountDeletionBasic(ctx interface{}, userID interface{}) *MockAuthServicer_CancelAccountDeletionBasic_Call {
+	return &MockAuthServicer_CancelAccountDeletionBasic_Call{Call: _e.mock.On("CancelAccountDeletionBasic", ctx, userID)}
+}
+
+func (_c *MockAuthServicer_CancelAccountDeletionBasic_Call) Run(run func(ctx context.Context, userID uuid.UUID)) *MockAuthServicer_CancelAccountDeletionBasic_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_CancelAccountDeletionBasic_Call) Return(_a0 *domain.User, _a1 error) *MockAuthServicer_CancelAccountDeletionBasic_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAuthServicer_CancelAccountDeletionBasic_Call) RunAndReturn(run func(context.Context, uuid.UUID) (*domain.User, error)) *MockAuthServicer_CancelAccountDeletionBasic_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ChangePassword provides a mock function with given fields: ctx, userID, req
+func (_m *MockAuthServicer) ChangePassword(ctx context.Context, userID uuid.UUID, req dto.ChangePasswordRequest) error {
+	ret := _m.Called(ctx, userID, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ChangePassword")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, dto.ChangePasswordRequest) error); ok {
+		r0 = rf(ctx, userID, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAuthServicer_ChangePassword_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ChangePassword'
+type MockAuthServicer_ChangePassword_Call struct {
+	*mock.Call
+}
+
+// ChangePassword is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+//   - req dto.ChangePasswordRequest
+func (_e *MockAuthServicer_Expecter) ChangePassword(ctx interface{}, userID interface{}, req interface{}) *MockAuthServicer_ChangePassword_Call {
+	return &MockAuthServicer_ChangePassword_Call{Call: _e.mock.On("ChangePassword", ctx, userID, req)}
+}
+
+func (_c *MockAuthServicer_ChangePassword_Call) Run(run func(ctx context.Context, userID uuid.UUID, req dto.ChangePasswordRequest)) *MockAuthServicer_ChangePassword_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID), args[2].(dto.ChangePasswordRequest))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_ChangePassword_Call) Return(_a0 error) *MockAuthServicer_ChangePassword_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAuthServicer_ChangePassword_Call) RunAndReturn(run func(context.Context, uuid.UUID, dto.ChangePasswordRequest) error) *MockAuthServicer_ChangePassword_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ExportAccountDataBasic provides a mock function with given fields: ctx, userID
+func (_m *MockAuthServicer) ExportAccountDataBasic(ctx context.Context, userID uuid.UUID) (map[string]interface{}, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExportAccountDataBasic")
+	}
+
+	var r0 map[string]interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) (map[string]interface{}, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) map[string]interface{}); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAuthServicer_ExportAccountDataBasic_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExportAccountDataBasic'
+type MockAuthServicer_ExportAccountDataBasic_Call struct {
+	*mock.Call
+}
+
+// ExportAccountDataBasic is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+func (_e *MockAuthServicer_Expecter) ExportAccountDataBasic(ctx interface{}, userID interface{}) *MockAuthServicer_ExportAccountDataBasic_Call {
+	return &MockAuthServicer_ExportAccountDataBasic_Call{Call: _e.mock.On("ExportAccountDataBasic", ctx, userID)}
+}
+
+func (_c *MockAuthServicer_ExportAccountDataBasic_Call) Run(run func(ctx context.Context, userID uuid.UUID)) *MockAuthServicer_ExportAccountDataBasic_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_ExportAccountDataBasic_Call) Return(_a0 map[string]interface{}, _a1 error) *MockAuthServicer_ExportAccountDataBasic_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAuthServicer_ExportAccountDataBasic_Call) RunAndReturn(run func(context.Context, uuid.UUID) (map[string]interface{}, error)) *MockAuthServicer_ExportAccountDataBasic_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindOrCreateOAuthUser provides a mock function with given fields: ctx, provider, providerID, email, displayName, avatarURL
 func (_m *MockAuthServicer) FindOrCreateOAuthUser(ctx context.Context, provider string, providerID string, email string, displayName string, avatarURL *string) (*dto.TokenPair, *domain.User, error) {
 	ret := _m.Called(ctx, provider, providerID, email, displayName, avatarURL)
@@ -98,6 +264,53 @@ func (_c *MockAuthServicer_FindOrCreateOAuthUser_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// ForgotPassword provides a mock function with given fields: ctx, email
+func (_m *MockAuthServicer) ForgotPassword(ctx context.Context, email string) error {
+	ret := _m.Called(ctx, email)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ForgotPassword")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, email)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAuthServicer_ForgotPassword_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ForgotPassword'
+type MockAuthServicer_ForgotPassword_Call struct {
+	*mock.Call
+}
+
+// ForgotPassword is a helper method to define mock.On call
+//   - ctx context.Context
+//   - email string
+func (_e *MockAuthServicer_Expecter) ForgotPassword(ctx interface{}, email interface{}) *MockAuthServicer_ForgotPassword_Call {
+	return &MockAuthServicer_ForgotPassword_Call{Call: _e.mock.On("ForgotPassword", ctx, email)}
+}
+
+func (_c *MockAuthServicer_ForgotPassword_Call) Run(run func(ctx context.Context, email string)) *MockAuthServicer_ForgotPassword_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_ForgotPassword_Call) Return(_a0 error) *MockAuthServicer_ForgotPassword_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAuthServicer_ForgotPassword_Call) RunAndReturn(run func(context.Context, string) error) *MockAuthServicer_ForgotPassword_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetProfile provides a mock function with given fields: ctx, userID
 func (_m *MockAuthServicer) GetProfile(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
 	ret := _m.Called(ctx, userID)
@@ -153,6 +366,65 @@ func (_c *MockAuthServicer_GetProfile_Call) Return(_a0 *domain.User, _a1 error) 
 }
 
 func (_c *MockAuthServicer_GetProfile_Call) RunAndReturn(run func(context.Context, uuid.UUID) (*domain.User, error)) *MockAuthServicer_GetProfile_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListSessions provides a mock function with given fields: ctx, userID
+func (_m *MockAuthServicer) ListSessions(ctx context.Context, userID uuid.UUID) ([]*domain.RefreshToken, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListSessions")
+	}
+
+	var r0 []*domain.RefreshToken
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) ([]*domain.RefreshToken, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) []*domain.RefreshToken); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*domain.RefreshToken)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAuthServicer_ListSessions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListSessions'
+type MockAuthServicer_ListSessions_Call struct {
+	*mock.Call
+}
+
+// ListSessions is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+func (_e *MockAuthServicer_Expecter) ListSessions(ctx interface{}, userID interface{}) *MockAuthServicer_ListSessions_Call {
+	return &MockAuthServicer_ListSessions_Call{Call: _e.mock.On("ListSessions", ctx, userID)}
+}
+
+func (_c *MockAuthServicer_ListSessions_Call) Run(run func(ctx context.Context, userID uuid.UUID)) *MockAuthServicer_ListSessions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_ListSessions_Call) Return(_a0 []*domain.RefreshToken, _a1 error) *MockAuthServicer_ListSessions_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAuthServicer_ListSessions_Call) RunAndReturn(run func(context.Context, uuid.UUID) ([]*domain.RefreshToken, error)) *MockAuthServicer_ListSessions_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -221,6 +493,100 @@ func (_c *MockAuthServicer_Login_Call) Return(_a0 *dto.TokenPair, _a1 *domain.Us
 }
 
 func (_c *MockAuthServicer_Login_Call) RunAndReturn(run func(context.Context, dto.LoginRequest) (*dto.TokenPair, *domain.User, error)) *MockAuthServicer_Login_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Logout provides a mock function with given fields: ctx, refreshToken
+func (_m *MockAuthServicer) Logout(ctx context.Context, refreshToken string) error {
+	ret := _m.Called(ctx, refreshToken)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Logout")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, refreshToken)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAuthServicer_Logout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Logout'
+type MockAuthServicer_Logout_Call struct {
+	*mock.Call
+}
+
+// Logout is a helper method to define mock.On call
+//   - ctx context.Context
+//   - refreshToken string
+func (_e *MockAuthServicer_Expecter) Logout(ctx interface{}, refreshToken interface{}) *MockAuthServicer_Logout_Call {
+	return &MockAuthServicer_Logout_Call{Call: _e.mock.On("Logout", ctx, refreshToken)}
+}
+
+func (_c *MockAuthServicer_Logout_Call) Run(run func(ctx context.Context, refreshToken string)) *MockAuthServicer_Logout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_Logout_Call) Return(_a0 error) *MockAuthServicer_Logout_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAuthServicer_Logout_Call) RunAndReturn(run func(context.Context, string) error) *MockAuthServicer_Logout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LogoutAll provides a mock function with given fields: ctx, userID
+func (_m *MockAuthServicer) LogoutAll(ctx context.Context, userID uuid.UUID) error {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogoutAll")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAuthServicer_LogoutAll_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogoutAll'
+type MockAuthServicer_LogoutAll_Call struct {
+	*mock.Call
+}
+
+// LogoutAll is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+func (_e *MockAuthServicer_Expecter) LogoutAll(ctx interface{}, userID interface{}) *MockAuthServicer_LogoutAll_Call {
+	return &MockAuthServicer_LogoutAll_Call{Call: _e.mock.On("LogoutAll", ctx, userID)}
+}
+
+func (_c *MockAuthServicer_LogoutAll_Call) Run(run func(ctx context.Context, userID uuid.UUID)) *MockAuthServicer_LogoutAll_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_LogoutAll_Call) Return(_a0 error) *MockAuthServicer_LogoutAll_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAuthServicer_LogoutAll_Call) RunAndReturn(run func(context.Context, uuid.UUID) error) *MockAuthServicer_LogoutAll_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -352,6 +718,207 @@ func (_c *MockAuthServicer_Register_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// RequestAccountDeletionBasic provides a mock function with given fields: ctx, userID
+func (_m *MockAuthServicer) RequestAccountDeletionBasic(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RequestAccountDeletionBasic")
+	}
+
+	var r0 *domain.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) (*domain.User, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) *domain.User); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*domain.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAuthServicer_RequestAccountDeletionBasic_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RequestAccountDeletionBasic'
+type MockAuthServicer_RequestAccountDeletionBasic_Call struct {
+	*mock.Call
+}
+
+// RequestAccountDeletionBasic is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+func (_e *MockAuthServicer_Expecter) RequestAccountDeletionBasic(ctx interface{}, userID interface{}) *MockAuthServicer_RequestAccountDeletionBasic_Call {
+	return &MockAuthServicer_RequestAccountDeletionBasic_Call{Call: _e.mock.On("RequestAccountDeletionBasic", ctx, userID)}
+}
+
+func (_c *MockAuthServicer_RequestAccountDeletionBasic_Call) Run(run func(ctx context.Context, userID uuid.UUID)) *MockAuthServicer_RequestAccountDeletionBasic_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_RequestAccountDeletionBasic_Call) Return(_a0 *domain.User, _a1 error) *MockAuthServicer_RequestAccountDeletionBasic_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAuthServicer_RequestAccountDeletionBasic_Call) RunAndReturn(run func(context.Context, uuid.UUID) (*domain.User, error)) *MockAuthServicer_RequestAccountDeletionBasic_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ResendVerification provides a mock function with given fields: ctx, email
+func (_m *MockAuthServicer) ResendVerification(ctx context.Context, email string) error {
+	ret := _m.Called(ctx, email)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResendVerification")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, email)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAuthServicer_ResendVerification_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResendVerification'
+type MockAuthServicer_ResendVerification_Call struct {
+	*mock.Call
+}
+
+// ResendVerification is a helper method to define mock.On call
+//   - ctx context.Context
+//   - email string
+func (_e *MockAuthServicer_Expecter) ResendVerification(ctx interface{}, email interface{}) *MockAuthServicer_ResendVerification_Call {
+	return &MockAuthServicer_ResendVerification_Call{Call: _e.mock.On("ResendVerification", ctx, email)}
+}
+
+func (_c *MockAuthServicer_ResendVerification_Call) Run(run func(ctx context.Context, email string)) *MockAuthServicer_ResendVerification_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_ResendVerification_Call) Return(_a0 error) *MockAuthServicer_ResendVerification_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAuthServicer_ResendVerification_Call) RunAndReturn(run func(context.Context, string) error) *MockAuthServicer_ResendVerification_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ResetPassword provides a mock function with given fields: ctx, req
+func (_m *MockAuthServicer) ResetPassword(ctx context.Context, req dto.ResetPasswordRequest) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResetPassword")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, dto.ResetPasswordRequest) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAuthServicer_ResetPassword_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResetPassword'
+type MockAuthServicer_ResetPassword_Call struct {
+	*mock.Call
+}
+
+// ResetPassword is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req dto.ResetPasswordRequest
+func (_e *MockAuthServicer_Expecter) ResetPassword(ctx interface{}, req interface{}) *MockAuthServicer_ResetPassword_Call {
+	return &MockAuthServicer_ResetPassword_Call{Call: _e.mock.On("ResetPassword", ctx, req)}
+}
+
+func (_c *MockAuthServicer_ResetPassword_Call) Run(run func(ctx context.Context, req dto.ResetPasswordRequest)) *MockAuthServicer_ResetPassword_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(dto.ResetPasswordRequest))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_ResetPassword_Call) Return(_a0 error) *MockAuthServicer_ResetPassword_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAuthServicer_ResetPassword_Call) RunAndReturn(run func(context.Context, dto.ResetPasswordRequest) error) *MockAuthServicer_ResetPassword_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RevokeSession provides a mock function with given fields: ctx, userID, sessionID
+func (_m *MockAuthServicer) RevokeSession(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID) error {
+	ret := _m.Called(ctx, userID, sessionID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RevokeSession")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, uuid.UUID) error); ok {
+		r0 = rf(ctx, userID, sessionID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAuthServicer_RevokeSession_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeSession'
+type MockAuthServicer_RevokeSession_Call struct {
+	*mock.Call
+}
+
+// RevokeSession is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+//   - sessionID uuid.UUID
+func (_e *MockAuthServicer_Expecter) RevokeSession(ctx interface{}, userID interface{}, sessionID interface{}) *MockAuthServicer_RevokeSession_Call {
+	return &MockAuthServicer_RevokeSession_Call{Call: _e.mock.On("RevokeSession", ctx, userID, sessionID)}
+}
+
+func (_c *MockAuthServicer_RevokeSession_Call) Run(run func(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID)) *MockAuthServicer_RevokeSession_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID), args[2].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_RevokeSession_Call) Return(_a0 error) *MockAuthServicer_RevokeSession_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAuthServicer_RevokeSession_Call) RunAndReturn(run func(context.Context, uuid.UUID, uuid.UUID) error) *MockAuthServicer_RevokeSession_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateProfile provides a mock function with given fields: ctx, userID, req
 func (_m *MockAuthServicer) UpdateProfile(ctx context.Context, userID uuid.UUID, req dto.UpdateProfileRequest) (*domain.User, error) {
 	ret := _m.Called(ctx, userID, req)
@@ -408,6 +975,53 @@ func (_c *MockAuthServicer_UpdateProfile_Call) Return(_a0 *domain.User, _a1 erro
 }
 
 func (_c *MockAuthServicer_UpdateProfile_Call) RunAndReturn(run func(context.Context, uuid.UUID, dto.UpdateProfileRequest) (*domain.User, error)) *MockAuthServicer_UpdateProfile_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// VerifyEmail provides a mock function with given fields: ctx, req
+func (_m *MockAuthServicer) VerifyEmail(ctx context.Context, req dto.VerifyEmailRequest) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for VerifyEmail")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, dto.VerifyEmailRequest) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAuthServicer_VerifyEmail_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'VerifyEmail'
+type MockAuthServicer_VerifyEmail_Call struct {
+	*mock.Call
+}
+
+// VerifyEmail is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req dto.VerifyEmailRequest
+func (_e *MockAuthServicer_Expecter) VerifyEmail(ctx interface{}, req interface{}) *MockAuthServicer_VerifyEmail_Call {
+	return &MockAuthServicer_VerifyEmail_Call{Call: _e.mock.On("VerifyEmail", ctx, req)}
+}
+
+func (_c *MockAuthServicer_VerifyEmail_Call) Run(run func(ctx context.Context, req dto.VerifyEmailRequest)) *MockAuthServicer_VerifyEmail_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(dto.VerifyEmailRequest))
+	})
+	return _c
+}
+
+func (_c *MockAuthServicer_VerifyEmail_Call) Return(_a0 error) *MockAuthServicer_VerifyEmail_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAuthServicer_VerifyEmail_Call) RunAndReturn(run func(context.Context, dto.VerifyEmailRequest) error) *MockAuthServicer_VerifyEmail_Call {
 	_c.Call.Return(run)
 	return _c
 }

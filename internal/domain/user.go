@@ -19,8 +19,22 @@ type User struct {
 	FSRSWeights      []float64  `json:"fsrs_weights,omitempty"`
 	ReminderEnabled  bool       `json:"reminder_enabled"`
 	ReminderTime     string     `json:"reminder_time"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	EmailVerifiedAt     *time.Time `json:"email_verified_at,omitempty"`
+	DeletionRequestedAt *time.Time `json:"deletion_requested_at,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+}
+
+func (u *User) IsEmailVerified() bool {
+	return u.EmailVerifiedAt != nil
+}
+
+func (u *User) IsPendingDeletion() bool {
+	return u.DeletionRequestedAt != nil
+}
+
+type UserDataExportRepository interface {
+	Dump(ctx context.Context, userID uuid.UUID) (map[string]any, error)
 }
 
 type OAuthAccount struct {
@@ -40,6 +54,14 @@ type UserRepository interface {
 	Update(ctx context.Context, user *User) error
 	Delete(ctx context.Context, id uuid.UUID) error
 
+	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
+	MarkEmailVerified(ctx context.Context, userID uuid.UUID, at time.Time) error
+
+	RequestDeletion(ctx context.Context, userID uuid.UUID, at time.Time) error
+	CancelDeletion(ctx context.Context, userID uuid.UUID) error
+	ListExpiredDeletions(ctx context.Context, before time.Time, limit int) ([]uuid.UUID, error)
+
 	CreateOAuthAccount(ctx context.Context, account *OAuthAccount) error
 	GetOAuthAccount(ctx context.Context, provider, providerID string) (*OAuthAccount, error)
+	ListOAuthAccountsByUser(ctx context.Context, userID uuid.UUID) ([]OAuthAccount, error)
 }

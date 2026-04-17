@@ -19,7 +19,7 @@ import (
 
 func TestAuthHandler_Register_Success(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	uid := uuid.New()
 	svc.EXPECT().Register(mock.Anything, mock.Anything).Return(
@@ -45,7 +45,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 
 func TestAuthHandler_Register_InvalidBody(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/register", strings.NewReader(`not json`))
 	rec := httptest.NewRecorder()
@@ -58,7 +58,7 @@ func TestAuthHandler_Register_InvalidBody(t *testing.T) {
 
 func TestAuthHandler_Register_ValidationError(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	body := `{"email":"not-an-email"}`
 	req := httptest.NewRequest(http.MethodPost, "/auth/register", strings.NewReader(body))
@@ -71,7 +71,7 @@ func TestAuthHandler_Register_ValidationError(t *testing.T) {
 
 func TestAuthHandler_Register_EmailTaken(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	svc.EXPECT().Register(mock.Anything, mock.Anything).Return(nil, nil, domain.ErrEmailTaken)
 
@@ -86,7 +86,7 @@ func TestAuthHandler_Register_EmailTaken(t *testing.T) {
 
 func TestAuthHandler_Login_Success(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	uid := uuid.New()
 	svc.EXPECT().Login(mock.Anything, mock.Anything).Return(
@@ -111,7 +111,7 @@ func TestAuthHandler_Login_Success(t *testing.T) {
 
 func TestAuthHandler_Login_InvalidBody(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(`{bad}`))
 	rec := httptest.NewRecorder()
@@ -122,7 +122,7 @@ func TestAuthHandler_Login_InvalidBody(t *testing.T) {
 
 func TestAuthHandler_Login_ValidationError(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	body := `{"email":"not-an-email"}`
 	req := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(body))
@@ -134,7 +134,7 @@ func TestAuthHandler_Login_ValidationError(t *testing.T) {
 
 func TestAuthHandler_Login_NotFound(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	svc.EXPECT().Login(mock.Anything, mock.Anything).Return(nil, nil, domain.ErrInvalidCredentials)
 
@@ -148,7 +148,7 @@ func TestAuthHandler_Login_NotFound(t *testing.T) {
 
 func TestAuthHandler_Me_Success(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	uid := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	user := &domain.User{ID: uid, DisplayName: "Test User", Email: "test@example.com"}
@@ -165,7 +165,7 @@ func TestAuthHandler_Me_Success(t *testing.T) {
 
 func TestAuthHandler_Me_NoUserID(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
 	rec := httptest.NewRecorder()
@@ -176,7 +176,7 @@ func TestAuthHandler_Me_NoUserID(t *testing.T) {
 
 func TestAuthHandler_Refresh_Success(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	svc.EXPECT().RefreshToken(mock.Anything, "valid-refresh-token").Return(
 		&dto.TokenPair{AccessToken: "new-at", RefreshToken: "new-rt", ExpiresAt: 456},
@@ -193,7 +193,7 @@ func TestAuthHandler_Refresh_Success(t *testing.T) {
 
 func TestAuthHandler_Refresh_InvalidBody(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", strings.NewReader(`bad`))
 	rec := httptest.NewRecorder()
@@ -206,7 +206,7 @@ func TestAuthHandler_Refresh_InvalidBody(t *testing.T) {
 
 func TestAuthHandler_UpdateProfile_Success(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	uid := uuid.New()
 	displayName := "New Name"
@@ -231,7 +231,7 @@ func TestAuthHandler_UpdateProfile_Success(t *testing.T) {
 
 func TestAuthHandler_UpdateProfile_NoUserID(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	body := `{"display_name":"New Name"}`
 	req := httptest.NewRequest(http.MethodPut, "/auth/me", strings.NewReader(body))
@@ -243,7 +243,7 @@ func TestAuthHandler_UpdateProfile_NoUserID(t *testing.T) {
 
 func TestAuthHandler_UpdateProfile_InvalidBody(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	req := httptest.NewRequest(http.MethodPut, "/auth/me", strings.NewReader(`{bad`))
 	req = req.WithContext(ctxWithUserID(uuid.New()))
@@ -255,7 +255,7 @@ func TestAuthHandler_UpdateProfile_InvalidBody(t *testing.T) {
 
 func TestAuthHandler_UpdateProfile_ValidationError(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	// display_name max is 100, send 101+ chars
 	body := `{"display_name":"` + strings.Repeat("x", 101) + `"}`
@@ -269,7 +269,7 @@ func TestAuthHandler_UpdateProfile_ValidationError(t *testing.T) {
 
 func TestAuthHandler_UpdateProfile_ServiceError(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	uid := uuid.New()
 	svc.EXPECT().UpdateProfile(mock.Anything, uid, mock.Anything).Return(nil, domain.ErrNotFound)
@@ -287,7 +287,7 @@ func TestAuthHandler_UpdateProfile_ServiceError(t *testing.T) {
 
 func TestAuthHandler_GoogleRedirect_NotImplemented(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/google", nil)
 	rec := httptest.NewRecorder()
@@ -298,7 +298,7 @@ func TestAuthHandler_GoogleRedirect_NotImplemented(t *testing.T) {
 
 func TestAuthHandler_GoogleCallback_NotImplemented(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/google/callback", nil)
 	rec := httptest.NewRecorder()
@@ -311,7 +311,7 @@ func TestAuthHandler_GoogleCallback_NotImplemented(t *testing.T) {
 
 func TestAuthHandler_Refresh_ServiceError(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	svc.EXPECT().RefreshToken(mock.Anything, "bad-token").Return(nil, domain.ErrUnauthorized)
 
@@ -327,7 +327,7 @@ func TestAuthHandler_Refresh_ServiceError(t *testing.T) {
 
 func TestAuthHandler_Me_ServiceError(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	uid := uuid.New()
 	svc.EXPECT().GetProfile(mock.Anything, uid).Return(nil, assert.AnError)
@@ -344,7 +344,7 @@ func TestAuthHandler_Me_ServiceError(t *testing.T) {
 
 func TestAuthHandler_Login_ServiceError(t *testing.T) {
 	svc := mockport.NewMockAuthServicer(t)
-	h := NewAuthHandler(svc)
+	h := NewAuthHandler(svc, AuthHandlerOptions{})
 
 	svc.EXPECT().Login(mock.Anything, mock.Anything).Return(nil, nil, domain.ErrInvalidCredentials)
 

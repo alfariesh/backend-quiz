@@ -13,9 +13,24 @@ type AuthServicer interface {
 	Register(ctx context.Context, req dto.RegisterRequest) (*dto.TokenPair, *domain.User, error)
 	Login(ctx context.Context, req dto.LoginRequest) (*dto.TokenPair, *domain.User, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*dto.TokenPair, error)
+	Logout(ctx context.Context, refreshToken string) error
+	LogoutAll(ctx context.Context, userID uuid.UUID) error
 	GetProfile(ctx context.Context, userID uuid.UUID) (*domain.User, error)
 	UpdateProfile(ctx context.Context, userID uuid.UUID, req dto.UpdateProfileRequest) (*domain.User, error)
 	FindOrCreateOAuthUser(ctx context.Context, provider, providerID, email, displayName string, avatarURL *string) (*dto.TokenPair, *domain.User, error)
+
+	VerifyEmail(ctx context.Context, req dto.VerifyEmailRequest) error
+	ResendVerification(ctx context.Context, email string) error
+	ForgotPassword(ctx context.Context, email string) error
+	ResetPassword(ctx context.Context, req dto.ResetPasswordRequest) error
+	ChangePassword(ctx context.Context, userID uuid.UUID, req dto.ChangePasswordRequest) error
+
+	ListSessions(ctx context.Context, userID uuid.UUID) ([]*domain.RefreshToken, error)
+	RevokeSession(ctx context.Context, userID, sessionID uuid.UUID) error
+
+	RequestAccountDeletionBasic(ctx context.Context, userID uuid.UUID) (*domain.User, error)
+	CancelAccountDeletionBasic(ctx context.Context, userID uuid.UUID) (*domain.User, error)
+	ExportAccountDataBasic(ctx context.Context, userID uuid.UUID) (map[string]any, error)
 }
 
 type CardServicer interface {

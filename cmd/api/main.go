@@ -20,6 +20,10 @@ import (
 	"github.com/alfariesh/backend-quiz/internal/middleware"
 	"github.com/alfariesh/backend-quiz/internal/repository"
 	"github.com/alfariesh/backend-quiz/internal/service"
+	"github.com/alfariesh/backend-quiz/pkg/captcha"
+	"github.com/alfariesh/backend-quiz/pkg/mailer"
+	"github.com/alfariesh/backend-quiz/pkg/oauth"
+	"github.com/alfariesh/backend-quiz/pkg/password"
 	"github.com/alfariesh/backend-quiz/pkg/storage"
 )
 
@@ -77,12 +81,63 @@ func run() error {
 	quizAttemptRepo := repository.NewQuizAttemptRepository(pool)
 	mediaRepo := repository.NewMediaRepository(pool)
 	goalRepo := repository.NewGoalRepository(pool)
+	evRepo := repository.NewEmailVerificationRepository(pool)
+	prtRepo := repository.NewPasswordResetTokenRepository(pool)
+	rtRepo := repository.NewRefreshTokenRepository(pool)
+	laRepo := repository.NewLoginAttemptRepository(pool)
+	auditRepo := repository.NewAuthAuditLogRepository(pool)
+	exportRepo := repository.NewUserDataExportRepository(pool)
 
 	// Unit of Work
 	uow := repository.NewUnitOfWork(pool)
 
+	// Mailer
+	var mailClient mailer.Mailer
+	if cfg.Mailer.ResendAPIKey != "" {
+		mailClient = mailer.NewResendClient(cfg.Mailer.ResendAPIKey, cfg.Mailer.FromAddress, cfg.Mailer.ReplyTo)
+		logger.Info("mailer: Resend configured")
+	} else {
+		mailClient = mailer.NoopMailer{}
+		logger.Warn("mailer: RESEND_API_KEY not set — emails will not be sent")
+	}
+
+	// Google OAuth
+	var googleClient *oauth.GoogleClient
+	if cfg.GoogleOAuth.Enabled() {
+		googleClient = oauth.NewGoogleClient(cfg.GoogleOAuth.ClientID, cfg.GoogleOAuth.ClientSecret, cfg.GoogleOAuth.RedirectURL)
+		logger.Info("google oauth configured")
+	} else {
+		logger.Warn("google oauth not configured")
+	}
+
 	// Services
-	authSvc := service.NewAuthService(userRepo, uow, cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.RefreshDuration)
+	authPolicy := service.AuthPolicy{
+		OTPLength:                  cfg.AuthPolicy.OTPLength,
+		OTPTTL:                     cfg.AuthPolicy.OTPTTL,
+		OTPMaxAttempts:             cfg.AuthPolicy.OTPMaxAttempts,
+		ResetTokenTTL:              cfg.AuthPolicy.ResetTokenTTL,
+		LoginLockoutWindow:         cfg.AuthPolicy.LoginLockoutWindow,
+		LoginLockoutMaxFails:       cfg.AuthPolicy.LoginLockoutMaxFails,
+		RequireEmailVerified:       cfg.AuthPolicy.RequireEmailVerified,
+		AccountDeletionGracePeriod: cfg.AuthPolicy.DeletionGracePeriod,
+	}
+	pwPolicy := password.Policy{
+		MinLength:    cfg.AuthPolicy.PasswordMinLength,
+		MaxLength:    cfg.AuthPolicy.PasswordMaxLength,
+		RequireMixed: cfg.AuthPolicy.PasswordRequireMixed,
+	}
+	if cfg.AuthPolicy.PasswordHIBPCheck {
+		pwPolicy.HIBPChecker = password.NewHIBPChecker()
+		logger.Info("password policy: HIBP breach check enabled")
+	}
+
+	authSvc := service.NewAuthService(
+		userRepo, evRepo, prtRepo, rtRepo, laRepo, auditRepo, exportRepo,
+		uow, mailClient, pwPolicy,
+		cfg.JWT.Secret, cfg.JWT.AccessDuration, cfg.JWT.RefreshDuration,
+		cfg.App.FrontendURL,
+		authPolicy,
+	)
 	deckSvc := service.NewDeckService(deckRepo, cardRepo, uow)
 	cardSvc := service.NewCardService(cardRepo, deckRepo)
 	studySvc := service.NewStudyService(cardRepo, reviewRepo, sessionRepo, userRepo, statsRepo, uow)
@@ -95,7 +150,13 @@ func run() error {
 
 	// Handlers
 	healthH := handler.NewHealthHandler(pool)
-	authH := handler.NewAuthHandler(authSvc)
+	authH := handler.NewAuthHandler(authSvc, handler.AuthHandlerOptions{
+		Google:           googleClient,
+		SuccessRedirect:  cfg.GoogleOAuth.SuccessRedirect,
+		FailureRedirect:  cfg.GoogleOAuth.FailureRedirect,
+		SecureCookies:    cfg.Server.Environment == "production",
+		TrustForwardedIP: cfg.Security.TrustForwardedFor,
+	})
 	deckH := handler.NewDeckHandler(deckSvc)
 	cardH := handler.NewCardHandler(cardSvc)
 	studyH := handler.NewStudyHandler(studySvc)
@@ -107,12 +168,29 @@ func run() error {
 	// Router
 	r := chi.NewRouter()
 
+	// Captcha verifier
+	var captchaVerifier captcha.Verifier
+	if cfg.Captcha.Enabled() {
+		captchaVerifier = captcha.NewTurnstile(cfg.Captcha.TurnstileSecret)
+		logger.Info("captcha: Turnstile configured")
+	} else {
+		captchaVerifier = captcha.NoopVerifier{}
+		logger.Warn("captcha: TURNSTILE_SECRET_KEY not set — captcha check disabled")
+	}
+
 	// Global middleware
-	rl := middleware.NewRateLimiter(10, 20)
+	rl := middleware.NewRateLimiterWithProxy(10, 20, cfg.Security.TrustForwardedFor)
+	authRL := middleware.NewRateLimiterWithProxy(cfg.Security.AuthRateLimitRPS, cfg.Security.AuthRateLimitBurst, cfg.Security.TrustForwardedFor)
+	captchaMW := middleware.Captcha(captchaVerifier, cfg.Security.TrustForwardedFor)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recovery(logger))
 	r.Use(middleware.Logging(logger))
-	r.Use(middleware.CORS)
+	r.Use(middleware.SecurityHeaders(middleware.SecurityHeadersOptions{
+		HSTSMaxAgeSeconds:     cfg.Security.HSTSMaxAge,
+		HSTSIncludeSubdomains: true,
+		ContentSecurityPolicy: cfg.Security.ContentSecurityPolicy,
+	}))
+	r.Use(middleware.CORS(cfg.Security.AllowedOrigins...))
 	r.Use(rl.Middleware)
 
 	// Health endpoints
@@ -123,11 +201,31 @@ func run() error {
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public auth routes
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", authH.Register)
-			r.Post("/login", authH.Login)
-			r.Post("/refresh", authH.Refresh)
-			r.Get("/google", authH.GoogleRedirect)
-			r.Get("/google/callback", authH.GoogleCallback)
+			// Refresh + logout: stricter IP rate limit only (no captcha — used on normal traffic).
+			r.Group(func(r chi.Router) {
+				r.Use(authRL.Middleware)
+				r.Post("/refresh", authH.Refresh)
+				r.Post("/logout", authH.Logout)
+				r.Post("/verify-email", authH.VerifyEmail)
+			})
+
+			// Abuse-prone endpoints: stricter IP rate limit + captcha.
+			r.Group(func(r chi.Router) {
+				r.Use(authRL.Middleware)
+				r.Use(captchaMW)
+				r.Post("/register", authH.Register)
+				r.Post("/login", authH.Login)
+				r.Post("/resend-verification", authH.ResendVerification)
+				r.Post("/forgot-password", authH.ForgotPassword)
+				r.Post("/reset-password", authH.ResetPassword)
+			})
+
+			// OAuth: stricter rate limit only (captcha not applicable to redirect flow).
+			r.Group(func(r chi.Router) {
+				r.Use(authRL.Middleware)
+				r.Get("/google", authH.GoogleRedirect)
+				r.Get("/google/callback", authH.GoogleCallback)
+			})
 		})
 
 		// Protected routes
@@ -137,6 +235,13 @@ func run() error {
 			// User
 			r.Get("/auth/me", authH.Me)
 			r.Put("/auth/me", authH.UpdateProfile)
+			r.Delete("/auth/me", authH.DeleteAccount)
+			r.Post("/auth/me/cancel-deletion", authH.CancelAccountDeletion)
+			r.Get("/auth/me/export", authH.ExportAccountData)
+			r.Post("/auth/change-password", authH.ChangePassword)
+			r.Post("/auth/logout-all", authH.LogoutAll)
+			r.Get("/auth/sessions", authH.ListSessions)
+			r.Delete("/auth/sessions/{sessionID}", authH.RevokeSession)
 
 			// Decks
 			r.Route("/decks", func(r chi.Router) {

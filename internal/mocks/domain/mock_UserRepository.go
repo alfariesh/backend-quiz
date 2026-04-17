@@ -8,6 +8,8 @@ import (
 	domain "github.com/alfariesh/backend-quiz/internal/domain"
 	mock "github.com/stretchr/testify/mock"
 
+	time "time"
+
 	uuid "github.com/google/uuid"
 )
 
@@ -22,6 +24,53 @@ type MockUserRepository_Expecter struct {
 
 func (_m *MockUserRepository) EXPECT() *MockUserRepository_Expecter {
 	return &MockUserRepository_Expecter{mock: &_m.Mock}
+}
+
+// CancelDeletion provides a mock function with given fields: ctx, userID
+func (_m *MockUserRepository) CancelDeletion(ctx context.Context, userID uuid.UUID) error {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CancelDeletion")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockUserRepository_CancelDeletion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CancelDeletion'
+type MockUserRepository_CancelDeletion_Call struct {
+	*mock.Call
+}
+
+// CancelDeletion is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+func (_e *MockUserRepository_Expecter) CancelDeletion(ctx interface{}, userID interface{}) *MockUserRepository_CancelDeletion_Call {
+	return &MockUserRepository_CancelDeletion_Call{Call: _e.mock.On("CancelDeletion", ctx, userID)}
+}
+
+func (_c *MockUserRepository_CancelDeletion_Call) Run(run func(ctx context.Context, userID uuid.UUID)) *MockUserRepository_CancelDeletion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockUserRepository_CancelDeletion_Call) Return(_a0 error) *MockUserRepository_CancelDeletion_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockUserRepository_CancelDeletion_Call) RunAndReturn(run func(context.Context, uuid.UUID) error) *MockUserRepository_CancelDeletion_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // Create provides a mock function with given fields: ctx, user
@@ -343,6 +392,221 @@ func (_c *MockUserRepository_GetOAuthAccount_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// ListExpiredDeletions provides a mock function with given fields: ctx, before, limit
+func (_m *MockUserRepository) ListExpiredDeletions(ctx context.Context, before time.Time, limit int) ([]uuid.UUID, error) {
+	ret := _m.Called(ctx, before, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListExpiredDeletions")
+	}
+
+	var r0 []uuid.UUID
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) ([]uuid.UUID, error)); ok {
+		return rf(ctx, before, limit)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) []uuid.UUID); ok {
+		r0 = rf(ctx, before, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]uuid.UUID)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, time.Time, int) error); ok {
+		r1 = rf(ctx, before, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserRepository_ListExpiredDeletions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListExpiredDeletions'
+type MockUserRepository_ListExpiredDeletions_Call struct {
+	*mock.Call
+}
+
+// ListExpiredDeletions is a helper method to define mock.On call
+//   - ctx context.Context
+//   - before time.Time
+//   - limit int
+func (_e *MockUserRepository_Expecter) ListExpiredDeletions(ctx interface{}, before interface{}, limit interface{}) *MockUserRepository_ListExpiredDeletions_Call {
+	return &MockUserRepository_ListExpiredDeletions_Call{Call: _e.mock.On("ListExpiredDeletions", ctx, before, limit)}
+}
+
+func (_c *MockUserRepository_ListExpiredDeletions_Call) Run(run func(ctx context.Context, before time.Time, limit int)) *MockUserRepository_ListExpiredDeletions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(time.Time), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockUserRepository_ListExpiredDeletions_Call) Return(_a0 []uuid.UUID, _a1 error) *MockUserRepository_ListExpiredDeletions_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserRepository_ListExpiredDeletions_Call) RunAndReturn(run func(context.Context, time.Time, int) ([]uuid.UUID, error)) *MockUserRepository_ListExpiredDeletions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListOAuthAccountsByUser provides a mock function with given fields: ctx, userID
+func (_m *MockUserRepository) ListOAuthAccountsByUser(ctx context.Context, userID uuid.UUID) ([]domain.OAuthAccount, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListOAuthAccountsByUser")
+	}
+
+	var r0 []domain.OAuthAccount
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) ([]domain.OAuthAccount, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) []domain.OAuthAccount); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]domain.OAuthAccount)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserRepository_ListOAuthAccountsByUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListOAuthAccountsByUser'
+type MockUserRepository_ListOAuthAccountsByUser_Call struct {
+	*mock.Call
+}
+
+// ListOAuthAccountsByUser is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+func (_e *MockUserRepository_Expecter) ListOAuthAccountsByUser(ctx interface{}, userID interface{}) *MockUserRepository_ListOAuthAccountsByUser_Call {
+	return &MockUserRepository_ListOAuthAccountsByUser_Call{Call: _e.mock.On("ListOAuthAccountsByUser", ctx, userID)}
+}
+
+func (_c *MockUserRepository_ListOAuthAccountsByUser_Call) Run(run func(ctx context.Context, userID uuid.UUID)) *MockUserRepository_ListOAuthAccountsByUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockUserRepository_ListOAuthAccountsByUser_Call) Return(_a0 []domain.OAuthAccount, _a1 error) *MockUserRepository_ListOAuthAccountsByUser_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserRepository_ListOAuthAccountsByUser_Call) RunAndReturn(run func(context.Context, uuid.UUID) ([]domain.OAuthAccount, error)) *MockUserRepository_ListOAuthAccountsByUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MarkEmailVerified provides a mock function with given fields: ctx, userID, at
+func (_m *MockUserRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID, at time.Time) error {
+	ret := _m.Called(ctx, userID, at)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkEmailVerified")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, time.Time) error); ok {
+		r0 = rf(ctx, userID, at)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockUserRepository_MarkEmailVerified_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkEmailVerified'
+type MockUserRepository_MarkEmailVerified_Call struct {
+	*mock.Call
+}
+
+// MarkEmailVerified is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+//   - at time.Time
+func (_e *MockUserRepository_Expecter) MarkEmailVerified(ctx interface{}, userID interface{}, at interface{}) *MockUserRepository_MarkEmailVerified_Call {
+	return &MockUserRepository_MarkEmailVerified_Call{Call: _e.mock.On("MarkEmailVerified", ctx, userID, at)}
+}
+
+func (_c *MockUserRepository_MarkEmailVerified_Call) Run(run func(ctx context.Context, userID uuid.UUID, at time.Time)) *MockUserRepository_MarkEmailVerified_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID), args[2].(time.Time))
+	})
+	return _c
+}
+
+func (_c *MockUserRepository_MarkEmailVerified_Call) Return(_a0 error) *MockUserRepository_MarkEmailVerified_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockUserRepository_MarkEmailVerified_Call) RunAndReturn(run func(context.Context, uuid.UUID, time.Time) error) *MockUserRepository_MarkEmailVerified_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RequestDeletion provides a mock function with given fields: ctx, userID, at
+func (_m *MockUserRepository) RequestDeletion(ctx context.Context, userID uuid.UUID, at time.Time) error {
+	ret := _m.Called(ctx, userID, at)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RequestDeletion")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, time.Time) error); ok {
+		r0 = rf(ctx, userID, at)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockUserRepository_RequestDeletion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RequestDeletion'
+type MockUserRepository_RequestDeletion_Call struct {
+	*mock.Call
+}
+
+// RequestDeletion is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+//   - at time.Time
+func (_e *MockUserRepository_Expecter) RequestDeletion(ctx interface{}, userID interface{}, at interface{}) *MockUserRepository_RequestDeletion_Call {
+	return &MockUserRepository_RequestDeletion_Call{Call: _e.mock.On("RequestDeletion", ctx, userID, at)}
+}
+
+func (_c *MockUserRepository_RequestDeletion_Call) Run(run func(ctx context.Context, userID uuid.UUID, at time.Time)) *MockUserRepository_RequestDeletion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID), args[2].(time.Time))
+	})
+	return _c
+}
+
+func (_c *MockUserRepository_RequestDeletion_Call) Return(_a0 error) *MockUserRepository_RequestDeletion_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockUserRepository_RequestDeletion_Call) RunAndReturn(run func(context.Context, uuid.UUID, time.Time) error) *MockUserRepository_RequestDeletion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, user
 func (_m *MockUserRepository) Update(ctx context.Context, user *domain.User) error {
 	ret := _m.Called(ctx, user)
@@ -386,6 +650,54 @@ func (_c *MockUserRepository_Update_Call) Return(_a0 error) *MockUserRepository_
 }
 
 func (_c *MockUserRepository_Update_Call) RunAndReturn(run func(context.Context, *domain.User) error) *MockUserRepository_Update_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdatePassword provides a mock function with given fields: ctx, userID, passwordHash
+func (_m *MockUserRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
+	ret := _m.Called(ctx, userID, passwordHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePassword")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, string) error); ok {
+		r0 = rf(ctx, userID, passwordHash)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockUserRepository_UpdatePassword_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdatePassword'
+type MockUserRepository_UpdatePassword_Call struct {
+	*mock.Call
+}
+
+// UpdatePassword is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uuid.UUID
+//   - passwordHash string
+func (_e *MockUserRepository_Expecter) UpdatePassword(ctx interface{}, userID interface{}, passwordHash interface{}) *MockUserRepository_UpdatePassword_Call {
+	return &MockUserRepository_UpdatePassword_Call{Call: _e.mock.On("UpdatePassword", ctx, userID, passwordHash)}
+}
+
+func (_c *MockUserRepository_UpdatePassword_Call) Run(run func(ctx context.Context, userID uuid.UUID, passwordHash string)) *MockUserRepository_UpdatePassword_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserRepository_UpdatePassword_Call) Return(_a0 error) *MockUserRepository_UpdatePassword_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockUserRepository_UpdatePassword_Call) RunAndReturn(run func(context.Context, uuid.UUID, string) error) *MockUserRepository_UpdatePassword_Call {
 	_c.Call.Return(run)
 	return _c
 }
