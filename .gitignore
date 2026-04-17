@@ -13,3 +13,10 @@ tmp/
 /api
 /worker
 .postman
+/PageIndex
+/OpenKB
+/langchain
+ingestion/.venv
+ingestion/__pycache__
+rag-service/.venv
+rag-service/__pycache__

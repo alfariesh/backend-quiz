@@ -18,6 +18,7 @@ type Config struct {
 	AuthPolicy  AuthPolicyConfig
 	Security    SecurityConfig
 	Captcha     CaptchaConfig
+	RAG         RAGConfig
 }
 
 type ServerConfig struct {
@@ -114,6 +115,11 @@ type CaptchaConfig struct {
 }
 
 func (c CaptchaConfig) Enabled() bool { return c.TurnstileSecret != "" }
+
+type RAGConfig struct {
+	ServiceURL string        `envconfig:"RAG_SERVICE_URL" default:"http://localhost:8001"`
+	Timeout    time.Duration `envconfig:"RAG_TIMEOUT" default:"120s"`
+}
 
 func Load() (*Config, error) {
 	var cfg Config

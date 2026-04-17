@@ -108,3 +108,8 @@ type GoalServicer interface {
 	ListWithProgress(ctx context.Context, userID uuid.UUID) ([]dto.GoalProgress, error)
 	DeleteGoal(ctx context.Context, userID, goalID uuid.UUID) error
 }
+
+type RAGServicer interface {
+	Query(ctx context.Context, userID uuid.UUID, req dto.RAGQueryRequest) (*domain.RAGQueryResult, error)
+	VerifyConversationOwner(ctx context.Context, userID, conversationID uuid.UUID) error
+}

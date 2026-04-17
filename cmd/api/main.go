@@ -147,6 +147,7 @@ func run() error {
 	r2Client := storage.NewR2Client(cfg.R2.AccountID, cfg.R2.AccessKeyID, cfg.R2.SecretAccessKey, cfg.R2.BucketName, cfg.R2.PublicURL)
 	mediaSvc := service.NewMediaService(mediaRepo, cardRepo, deckRepo, r2Client, cfg.R2)
 	goalSvc := service.NewGoalService(goalRepo, reviewRepo)
+	ragSvc := service.NewRAGService(pool, cfg.RAG.ServiceURL, cfg.RAG.Timeout)
 
 	// Handlers
 	healthH := handler.NewHealthHandler(pool)
@@ -164,6 +165,9 @@ func run() error {
 	quizH := handler.NewQuizHandler(quizSvc)
 	mediaH := handler.NewMediaHandler(mediaSvc)
 	goalH := handler.NewGoalHandler(goalSvc)
+	// SSE passes through the handler's own client (no request timeout; streams can run long).
+	ragStreamClient := &http.Client{}
+	ragH := handler.NewRAGHandler(ragSvc, cfg.RAG.ServiceURL, ragStreamClient)
 
 	// Router
 	r := chi.NewRouter()
@@ -311,6 +315,12 @@ func run() error {
 				r.Post("/", goalH.SetGoal)
 				r.Get("/", goalH.ListWithProgress)
 				r.Delete("/{goalID}", goalH.DeleteGoal)
+			})
+
+			// RAG (proxy → Python rag-service)
+			r.Route("/rag", func(r chi.Router) {
+				r.Post("/query", ragH.Query)
+				r.Post("/query/stream", ragH.QueryStream)
 			})
 
 			// Quizzes
