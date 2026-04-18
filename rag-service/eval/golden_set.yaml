@@ -1,0 +1,54 @@
+# Surau RAG — golden evaluation set
+#
+# Isi file ini dengan Q&A asli dari kitab yang sudah ter-ingest.
+# Tujuan: benchmark akurasi retrieval + citation + fidelitas jawaban.
+#
+# Tiap entri kitab diidentifikasi by `kitab_slug` (lookup ke tabel kitab.slug).
+# Target ideal: 30 Q&A covering 2-3 kitab dengan variasi query:
+#   - exact-fact queries ("berapa kali baca shalawat untuk X")
+#   - thematic queries ("apa hukum Y")
+#   - cross-lingual (Indonesian question → Arabic content)
+#   - long-context (jawaban menyebar beberapa halaman)
+#
+# Semua field kecuali `question` + `mode` bersifat opsional tapi
+# tiap field yang Anda isi menambah dimensi eval yang bisa diukur.
+
+defaults:
+  style: standard
+  mode: per_kitab
+
+questions:
+  # ─── CONTOH ENTRI — GANTI DENGAN DATA RIIL ANDA ──────────────────
+  - id: example-001
+    question: "Berapa kali membaca shalawat tertentu untuk dimudahkan rezeki?"
+    mode: per_kitab
+    kitab_slug: afdhalush-shalawat-grok     # harus match kitab.slug di DB
+    style: standard
+
+    # ─ Expected citation ─
+    # Jawaban yang benar harus punya citation minimal SATU chunk
+    # yang start_page/end_page overlap dengan range ini.
+    expected_pages: [45, 46, 47]
+
+    # ─ Expected verbatim ─
+    # String Arabic yang HARUS muncul di `answer` atau `extracted_quotes`.
+    # Harus copy-paste tepat dari PDF. Kalau tidak muncul = halusinasi/miss.
+    expected_arabic_contains:
+      - "ثمانين مرة"
+
+    # ─ Expected answer gist (untuk LLM-as-judge) ─
+    # Deskripsi singkat jawaban benar dalam bahasa apapun.
+    # Judge akan rate apakah jawaban model menyampaikan poin ini.
+    expected_answer_gist: "Membaca shalawat tertentu sebanyak 80 kali pada hari Jumat"
+
+    notes: "Placeholder — ganti dengan Q&A real setelah tahu konten kitab"
+
+  # ─── TEMPLATE KOSONG — COPY & ISI ────────────────────────────────
+  # - id: <slug-unik>
+  #   question: ""
+  #   mode: per_kitab            # atau: general
+  #   kitab_slug: ""             # wajib untuk per_kitab, kosongkan untuk general
+  #   expected_pages: []
+  #   expected_arabic_contains: []
+  #   expected_answer_gist: ""
+  #   notes: ""
